@@ -51,8 +51,7 @@ interface TeeTime {
 
 interface BackupMember {
   id: string
-  invited_name: string | null
-  profiles: { name: string } | null
+  name: string
 }
 
 interface AdminTeeTimeDetailProps {
@@ -100,10 +99,14 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
     authFetch(`/api/members?groupId=${groupId}`)
       .then(r => r.json())
       .then(data => {
-        const available = (data.members ?? []).filter(
-          (m: BackupMember & { player_type: string }) =>
+        const available = (data.members ?? [])
+          .filter((m: { id: string; player_type: string }) =>
             m.player_type === 'backup' && !invitedMemberIds.has(m.id)
-        )
+          )
+          .map((m: { id: string; invited_name: string | null; profiles: { name: string } | { name: string }[] | null }) => {
+            const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+            return { id: m.id, name: profile?.name ?? m.invited_name ?? 'Unknown' }
+          })
         setBackups(available)
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,6 +126,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
       toast.success('Backup player invited.')
       setSelectedBackup('')
       onRefresh()
+      onClose()
     } catch {
       toast.error('Network error — please try again.')
     } finally {
@@ -254,13 +258,16 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                 <div className="flex gap-2">
                   <Select value={selectedBackup} onValueChange={(v) => setSelectedBackup(v ?? '')}>
                     <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select backup player..." />
+                      <SelectValue>
+                        {selectedBackup
+                          ? (backups.find(m => m.id === selectedBackup)?.name ?? 'Player')
+                          : <span className="text-muted-foreground">Select backup player...</span>}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {backups.map((m) => {
-                        const name = (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)?.name ?? m.invited_name ?? 'Unknown'
-                        return <SelectItem key={m.id} value={m.id}>{name}</SelectItem>
-                      })}
+                      {backups.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Button onClick={handleInviteBackup} disabled={!selectedBackup || inviting} size="sm">
