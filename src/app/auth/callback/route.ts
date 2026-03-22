@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -8,10 +9,28 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-    if (!error) {
-      // Ensure `next` is a relative path to prevent open redirect
+    if (!error && data.user) {
+      const adminSupabase = createAdminClient()
+
+      // Ensure a profile row exists
+      await adminSupabase.from('profiles').upsert(
+        {
+          id: data.user.id,
+          email: data.user.email!,
+          name: data.user.user_metadata?.full_name ?? data.user.email!.split('@')[0],
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
+
+      // Link any pending group_members records that were invited by this email
+      await adminSupabase
+        .from('group_members')
+        .update({ user_id: data.user.id, invited_email: null })
+        .eq('invited_email', data.user.email!)
+        .is('user_id', null)
+
       const redirectPath = next.startsWith('/') ? next : '/dashboard'
       return NextResponse.redirect(`${origin}${redirectPath}`)
     }
