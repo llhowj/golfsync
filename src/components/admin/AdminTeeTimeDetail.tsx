@@ -252,7 +252,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                   Invite Backup Player
                 </p>
                 <div className="flex gap-2">
-                  <Select value={selectedBackup} onValueChange={setSelectedBackup}>
+                  <Select value={selectedBackup} onValueChange={(v) => setSelectedBackup(v ?? '')}>
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Select backup player..." />
                     </SelectTrigger>
