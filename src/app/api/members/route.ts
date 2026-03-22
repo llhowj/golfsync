@@ -1,15 +1,16 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getUserFromRequest } from '@/lib/get-user'
 
 // GET /api/members?groupId=X — list all members in the group
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
   const groupId = request.nextUrl.searchParams.get('groupId')
   if (!groupId) return NextResponse.json({ error: 'groupId required' }, { status: 400 })
 
-  // Verify the requesting user belongs to this group
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = await createClient()
 
   const { data: memberCheck } = await supabase
     .from('group_members')
@@ -35,9 +36,10 @@ export async function GET(request: NextRequest) {
 
 // POST /api/members — add a player to the group
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = await createClient()
 
   const body = await request.json()
   const { groupId, name, email, phone, playerType } = body
@@ -110,9 +112,10 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/members — edit a player's info
 export async function PUT(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = await createClient()
 
   const body = await request.json()
   const { memberId, groupId, name, email, phone, playerType } = body
@@ -164,9 +167,10 @@ export async function PUT(request: NextRequest) {
 
 // PATCH /api/members — update backup rank order
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = await createClient()
 
   const body = await request.json()
   const { groupId, orderedMemberIds } = body // array of backup member IDs in new order

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { authFetch } from '@/lib/auth-fetch'
 
 interface MemberProfile {
   id: string
@@ -51,7 +52,7 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
   const fetchMembers = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/members?groupId=${groupId}`)
+      const res = await authFetch(`/api/members?groupId=${groupId}`)
       if (res.ok) {
         const data = await res.json()
         setMembers(data.members ?? [])
@@ -90,7 +91,7 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
     }
     setAddSaving(true)
     try {
-      const res = await fetch('/api/members', {
+      const res = await authFetch('/api/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,7 +133,7 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
 
     setEditSaving(true)
     try {
-      const res = await fetch('/api/members', {
+      const res = await authFetch('/api/members', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -163,7 +164,7 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
     if (direction === 'down' && index === sorted.length - 1) return
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     ;[sorted[index], sorted[swapIndex]] = [sorted[swapIndex], sorted[index]]
-    await fetch('/api/members', {
+    await authFetch('/api/members', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ groupId, orderedMemberIds: sorted.map(m => m.id) }),

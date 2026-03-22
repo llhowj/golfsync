@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { authFetch } from '@/lib/auth-fetch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { TeeTimeCard } from '@/components/admin/TeeTimeCard'
@@ -66,7 +67,7 @@ export function AdminDashboard({ groupId, memberId }: AdminDashboardProps) {
   const fetchTeeTimes = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/tee-times?groupId=${groupId}`)
+      const res = await authFetch(`/api/tee-times?groupId=${groupId}`)
       if (res.ok) {
         const data = await res.json()
         setTeeTimes(data.upcoming ?? [])

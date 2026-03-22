@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { authFetch } from '@/lib/auth-fetch'
 import {
   Dialog,
   DialogContent,
@@ -82,7 +83,7 @@ export function AdminTeeTimeDetail({ teeTime, onClose, onRefresh }: AdminTeeTime
   async function handleCancel() {
     setCancelling(true)
     try {
-      const res = await fetch(`/api/tee-times/${teeTime.id}`, {
+      const res = await authFetch(`/api/tee-times/${teeTime.id}`, {
         method: 'DELETE',
       })
       if (res.ok) {

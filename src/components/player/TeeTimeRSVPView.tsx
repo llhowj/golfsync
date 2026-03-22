@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { RSVPCard } from '@/components/player/RSVPCard'
+import { authFetch } from '@/lib/auth-fetch'
 
 interface TeeTime {
   id: string
@@ -35,7 +36,7 @@ export function TeeTimeRSVPView({
   const [confirmedPlayers, setConfirmedPlayers] = useState<string[]>(initialConfirmedPlayers)
 
   async function handleRsvp(status: 'in' | 'out', note?: string) {
-    const res = await fetch('/api/rsvp', {
+    const res = await authFetch('/api/rsvp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teeTimeId: teeTime.id, memberId, status, note }),

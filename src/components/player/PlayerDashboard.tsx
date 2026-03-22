@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { RSVPCard } from '@/components/player/RSVPCard'
+import { authFetch } from '@/lib/auth-fetch'
 
 interface RsvpStatus {
   status: 'in' | 'out' | 'pending'
@@ -55,7 +56,7 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
   const fetchTeeTimes = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/player/tee-times?memberId=${memberId}`)
+      const res = await authFetch(`/api/player/tee-times?memberId=${memberId}`)
       if (res.ok) {
         const data = await res.json()
         setTeeTimes(data.teeTimes ?? [])
@@ -70,7 +71,7 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
   }, [fetchTeeTimes])
 
   async function handleRsvp(teeTimeId: string, status: 'in' | 'out', note?: string) {
-    const res = await fetch('/api/rsvp', {
+    const res = await authFetch('/api/rsvp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teeTimeId, memberId, status, note }),

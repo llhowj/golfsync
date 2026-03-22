@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { authFetch } from '@/lib/auth-fetch'
 import {
   Dialog,
   DialogContent,
@@ -59,7 +60,7 @@ export function AddTeeTimeDialog({
     setSubmitting(true)
 
     try {
-      const res = await fetch('/api/tee-times', {
+      const res = await authFetch('/api/tee-times', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
