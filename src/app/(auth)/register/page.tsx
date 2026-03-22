@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
 
   const supabase = createClient()
+  const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -29,13 +31,11 @@ export default function RegisterPage() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: {
-          full_name: name.trim(),
-        },
+        data: { full_name: name.trim() },
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
       },
     })
@@ -43,6 +43,17 @@ export default function RegisterPage() {
     if (error) {
       setError(error.message)
       setLoading(false)
+      return
+    }
+
+    // If email confirmation is disabled, Supabase returns a session immediately
+    if (data.session) {
+      // Create profile and link any pending group member invites
+      await fetch('/api/auth/setup', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+      })
+      router.push('/dashboard')
       return
     }
 
