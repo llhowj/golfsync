@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/get-user'
+import { sendPlayerInviteEmail } from '@/lib/email'
 
 // GET /api/members?groupId=X — list all members in the group
 export async function GET(request: NextRequest) {
@@ -99,6 +100,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This player is already in the group' }, { status: 409 })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Send invite email to the new player (only if they don't already have an account)
+  if (!existingProfile) {
+    const { data: groupData } = await adminSupabase
+      .from('groups')
+      .select('name')
+      .eq('id', groupId)
+      .single()
+
+    await sendPlayerInviteEmail(
+      { name, email },
+      groupData?.name ?? 'Your Golf Group',
+    )
   }
 
   return NextResponse.json({ member }, { status: 201 })

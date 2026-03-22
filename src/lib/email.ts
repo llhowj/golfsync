@@ -150,6 +150,35 @@ export async function sendDeadlineAlert(
   })
 }
 
+// ── Player invite ─────────────────────────────────────────────────────────
+
+export async function sendPlayerInviteEmail(
+  recipient: Recipient,
+  groupName: string,
+) {
+  if (!isConfigured()) {
+    console.log('[email] RESEND_API_KEY not set — skipping player_invite email')
+    return
+  }
+
+  const signUpUrl = `${APP_URL}/register`
+
+  await getResend().emails.send({
+    from: FROM,
+    to: recipient.email,
+    subject: `You've been invited to ${groupName} on GolfSync`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="margin-bottom:4px">⛳ You're invited!</h2>
+        <p>Hi ${recipient.name},</p>
+        <p>You've been added to <strong>${groupName}</strong> on GolfSync. Create your free account to RSVP to tee times and stay in sync with your group.</p>
+        <a href="${signUpUrl}" style="display:inline-block;background:#18181b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Create Account</a>
+        <p style="color:#999;font-size:12px;margin-top:24px">You're receiving this because a group admin added you to ${groupName} on GolfSync.</p>
+      </div>
+    `,
+  })
+}
+
 // ── RSVP change alert to admin ────────────────────────────────────────────
 
 export async function sendRsvpChangeAlert(
