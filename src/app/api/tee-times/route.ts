@@ -90,14 +90,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { groupId: string; date: string; time: string; course: string; maxSlots: number }
+  let body: { groupId: string; date: string; time: string; course: string; maxSlots: number; inviteeIds?: string[] }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { groupId, date, time, course, maxSlots } = body
+  const { groupId, date, time, course, maxSlots, inviteeIds } = body
 
   if (!groupId || !date || !time || !course) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -135,16 +135,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: ttError?.message ?? 'Failed to create tee time' }, { status: 500 })
   }
 
-  // Fetch all core members
-  const { data: coreMembers } = await adminSupabase
+  // Fetch invitees: use explicit list if provided, otherwise all core members
+  const membersQuery = adminSupabase
     .from('group_members')
     .select('id, invited_email, invited_name, profiles(name, email)')
     .eq('group_id', groupId)
-    .eq('player_type', 'core')
 
-  if (coreMembers && coreMembers.length > 0) {
+  const { data: invitees } = inviteeIds && inviteeIds.length > 0
+    ? await membersQuery.in('id', inviteeIds)
+    : await membersQuery.eq('player_type', 'core')
+
+  if (invitees && invitees.length > 0) {
     await adminSupabase.from('invites').insert(
-      coreMembers.map((m) => ({
+      invitees.map((m) => ({
         tee_time_id: teeTime.id,
         member_id: m.id,
         invite_type: 'core' as const,
@@ -152,7 +155,7 @@ export async function POST(request: NextRequest) {
     )
 
     await adminSupabase.from('rsvps').insert(
-      coreMembers.map((m) => ({
+      invitees.map((m) => ({
         tee_time_id: teeTime.id,
         member_id: m.id,
         status: m.id === adminMember.id ? ('in' as const) : ('pending' as const),
@@ -165,7 +168,7 @@ export async function POST(request: NextRequest) {
       .eq('id', groupId)
       .single()
 
-    const recipients = coreMembers
+    const recipients = invitees
       .filter((m) => m.id !== adminMember.id)
       .map((m) => {
         const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
