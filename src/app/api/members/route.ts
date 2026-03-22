@@ -1,4 +1,4 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/get-user'
 
@@ -10,9 +10,10 @@ export async function GET(request: NextRequest) {
   const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = await createClient()
+  const adminSupabase = createAdminClient()
 
-  const { data: memberCheck } = await supabase
+  // Verify the requesting user belongs to this group
+  const { data: memberCheck } = await adminSupabase
     .from('group_members')
     .select('id')
     .eq('group_id', groupId)
@@ -21,8 +22,6 @@ export async function GET(request: NextRequest) {
 
   if (!memberCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Use admin client to read all members — RLS only shows the user's own row
-  const adminSupabase = createAdminClient()
   const { data, error } = await adminSupabase
     .from('group_members')
     .select('id, player_type, backup_rank, is_admin, invited_name, invited_email, notification_channels, profiles(id, name, email, phone)')
@@ -39,8 +38,6 @@ export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = await createClient()
-
   const body = await request.json()
   const { groupId, name, email, phone, playerType } = body
 
@@ -48,8 +45,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'groupId, name, email, and playerType are required' }, { status: 400 })
   }
 
+  const adminSupabase = createAdminClient()
+
   // Verify the requesting user is an admin of this group
-  const { data: adminCheck } = await supabase
+  const { data: adminCheck } = await adminSupabase
     .from('group_members')
     .select('id')
     .eq('group_id', groupId)
@@ -62,7 +61,7 @@ export async function POST(request: NextRequest) {
   // If adding a backup, find the next rank
   let backupRank: number | null = null
   if (playerType === 'backup') {
-    const { data: existingBackups } = await supabase
+    const { data: existingBackups } = await adminSupabase
       .from('group_members')
       .select('backup_rank')
       .eq('group_id', groupId)
@@ -73,9 +72,6 @@ export async function POST(request: NextRequest) {
 
     backupRank = existingBackups?.backup_rank != null ? existingBackups.backup_rank + 1 : 1
   }
-
-  // Use service role for writes — admin check already done above
-  const adminSupabase = createAdminClient()
 
   // Check if a user with this email already exists in profiles
   const { data: existingProfile } = await adminSupabase
@@ -105,8 +101,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // TODO: send invite email via Resend when RESEND_API_KEY is configured
-
   return NextResponse.json({ member }, { status: 201 })
 }
 
@@ -115,8 +109,6 @@ export async function PUT(request: NextRequest) {
   const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = await createClient()
-
   const body = await request.json()
   const { memberId, groupId, name, email, phone, playerType } = body
 
@@ -124,7 +116,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'memberId and groupId required' }, { status: 400 })
   }
 
-  const { data: adminCheck } = await supabase
+  const adminSupabase = createAdminClient()
+
+  const { data: adminCheck } = await adminSupabase
     .from('group_members')
     .select('id')
     .eq('group_id', groupId)
@@ -133,8 +127,6 @@ export async function PUT(request: NextRequest) {
     .maybeSingle()
 
   if (!adminCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const adminSupabase = createAdminClient()
 
   // Fetch the member to know if they have an active profile
   const { data: member } = await adminSupabase
@@ -157,7 +149,7 @@ export async function PUT(request: NextRequest) {
     await adminSupabase.from('group_members').update(memberUpdate).eq('id', memberId)
   }
 
-  // If they have a profile, update phone (name/email are theirs to manage)
+  // If they have a profile, update phone
   if (member.user_id && phone !== undefined) {
     await adminSupabase.from('profiles').update({ phone: phone || null }).eq('id', member.user_id)
   }
@@ -170,16 +162,16 @@ export async function PATCH(request: NextRequest) {
   const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = await createClient()
-
   const body = await request.json()
-  const { groupId, orderedMemberIds } = body // array of backup member IDs in new order
+  const { groupId, orderedMemberIds } = body
 
   if (!groupId || !Array.isArray(orderedMemberIds)) {
     return NextResponse.json({ error: 'groupId and orderedMemberIds required' }, { status: 400 })
   }
 
-  const { data: adminCheck } = await supabase
+  const adminSupabase = createAdminClient()
+
+  const { data: adminCheck } = await adminSupabase
     .from('group_members')
     .select('id')
     .eq('group_id', groupId)
@@ -189,7 +181,6 @@ export async function PATCH(request: NextRequest) {
 
   if (!adminCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const adminSupabase = createAdminClient()
   const updates = orderedMemberIds.map((id: string, index: number) =>
     adminSupabase.from('group_members').update({ backup_rank: index + 1 }).eq('id', id)
   )
