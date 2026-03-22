@@ -134,6 +134,21 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
     }
   }
 
+  function buildGoogleCalendarUrl() {
+    const [year, month, day] = teeTime.date.split('-').map(Number)
+    const [hour, minute] = teeTime.start_time.split(':').map(Number)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const start = `${year}${pad(month)}${pad(day)}T${pad(hour)}${pad(minute)}00`
+    const end = `${year}${pad(month)}${pad(day)}T${pad(hour + 5)}${pad(minute)}00`
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: `Golf — ${teeTime.course}`,
+      dates: `${start}/${end}`,
+      location: teeTime.course,
+    })
+    return `https://www.google.com/calendar/render?${params.toString()}`
+  }
+
   async function handleCancel() {
     setCancelling(true)
     try {
@@ -167,7 +182,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
 
         <div className="space-y-5 py-2">
           {/* Slot summary */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Badge variant="secondary" className="text-sm px-3 py-1">
               {inPlayers.length}/{teeTime.max_slots} confirmed
             </Badge>
@@ -179,6 +194,16 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                 {teeTime.max_slots - inPlayers.length} open slot
                 {teeTime.max_slots - inPlayers.length !== 1 ? 's' : ''}
               </Badge>
+            )}
+            {!teeTime.deleted_at && (
+              <a
+                href={buildGoogleCalendarUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground underline-offset-4 hover:underline hover:text-foreground"
+              >
+                + Add to Google Calendar
+              </a>
             )}
           </div>
 
