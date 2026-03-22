@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
   const user = await getUserFromRequest(request)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -184,4 +185,9 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ teeTime }, { status: 201 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[POST /api/tee-times] Unhandled error:', message)
+    return NextResponse.json({ error: `Internal error: ${message}` }, { status: 500 })
+  }
 }
