@@ -1,65 +1,124 @@
-import Image from "next/image";
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
-export default function Home() {
+export default async function LandingPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
+    redirect('/dashboard')
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="flex flex-col min-h-full">
+      {/* Nav */}
+      <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">⛳</span>
+            <span className="text-xl font-bold tracking-tight">GolfSync</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className={cn(buttonVariants({ variant: 'ghost' }))}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Sign In
+            </Link>
+            <Link
+              href="/register"
+              className={cn(buttonVariants({ variant: 'default' }))}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              Get Started
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      {/* Hero */}
+      <main className="flex-1 flex flex-col">
+        <section className="flex-1 flex flex-col items-center justify-center text-center px-4 py-20 sm:py-32 bg-gradient-to-b from-background to-muted/40">
+          <div className="max-w-3xl mx-auto space-y-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-1.5 text-sm text-muted-foreground">
+              <span className="text-green-600 font-medium">New</span>
+              Tee time coordination, simplified
+            </div>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight">
+              Keep your golf group{' '}
+              <span className="text-green-600">in sync</span>
+            </h1>
+            <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              GolfSync helps golf groups coordinate tee times, manage RSVPs, and
+              fill open slots automatically — so your foursome is always full.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <Link
+                href="/register"
+                className={cn(
+                  buttonVariants({ size: 'lg' }),
+                  'w-full sm:w-auto',
+                )}
+              >
+                Get Started Free
+              </Link>
+              <Link
+                href="/login"
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'lg' }),
+                  'w-full sm:w-auto',
+                )}
+              >
+                Sign In
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section className="py-20 px-4 bg-muted/30">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">
+              Everything your golf group needs
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+              <div className="flex flex-col items-center text-center gap-3 p-6 rounded-xl bg-background border border-border">
+                <div className="text-4xl">📅</div>
+                <h3 className="font-semibold text-lg">Easy Scheduling</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Post tee times in seconds. Your group gets notified instantly
+                  and can RSVP with one tap.
+                </p>
+              </div>
+              <div className="flex flex-col items-center text-center gap-3 p-6 rounded-xl bg-background border border-border">
+                <div className="text-4xl">🔄</div>
+                <h3 className="font-semibold text-lg">Auto Backfill</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  When a core player drops out, backup players are automatically
+                  invited to fill the slot.
+                </p>
+              </div>
+              <div className="flex flex-col items-center text-center gap-3 p-6 rounded-xl bg-background border border-border">
+                <div className="text-4xl">📊</div>
+                <h3 className="font-semibold text-lg">Group Insights</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Track attendance history and RSVP patterns to keep your group
+                  organized all season.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-border py-6 text-center text-sm text-muted-foreground">
+        <p>&copy; {new Date().getFullYear()} GolfSync. All rights reserved.</p>
+      </footer>
     </div>
-  );
+  )
 }
