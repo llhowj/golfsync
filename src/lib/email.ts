@@ -1,8 +1,10 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
-const FROM = 'GolfSync <onboarding@resend.dev>'
+const FROM = 'GolfSync <notifications@golfsync.app>'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
 function isConfigured() {
@@ -50,7 +52,7 @@ export async function sendTeeTimePostedEmails(
 
   const results = await Promise.allSettled(
     recipients.map(({ name, email }) =>
-      resend.emails.send({
+      getResend().emails.send({
         from: FROM,
         to: email,
         subject: `⛳ New tee time: ${formatDate(data.date)} at ${data.course}`,
@@ -92,7 +94,7 @@ export async function sendTeeTimeCancelledEmails(
 
   await Promise.allSettled(
     recipients.map(({ name, email }) =>
-      resend.emails.send({
+      getResend().emails.send({
         from: FROM,
         to: email,
         subject: `Cancelled: ${formatDate(data.date)} at ${data.course}`,
@@ -127,7 +129,7 @@ export async function sendDeadlineAlert(
 
   const dashboardUrl = `${APP_URL}/dashboard`
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: admin.email,
     subject: `⚠️ 48-hour deadline: ${openSlots} open slot${openSlots > 1 ? 's' : ''} on ${formatDate(data.date)}`,
@@ -163,7 +165,7 @@ export async function sendRsvpChangeAlert(
 
   const dashboardUrl = `${APP_URL}/dashboard`
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: admin.email,
     subject: `${player.name} changed their RSVP to ${newStatus.toUpperCase()} — ${formatDate(data.date)}`,
