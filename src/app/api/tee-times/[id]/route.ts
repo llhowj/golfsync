@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getUserFromRequest } from '@/lib/get-user'
 import { sendTeeTimeCancelledEmails } from '@/lib/email'
 
@@ -12,7 +12,6 @@ export async function DELETE(
   const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = await createClient()
   const adminSupabase = createAdminClient()
 
   // Fetch the tee time and verify the user is an admin of the group
@@ -25,7 +24,7 @@ export async function DELETE(
   if (!teeTime) return NextResponse.json({ error: 'Tee time not found' }, { status: 404 })
   if (teeTime.deleted_at) return NextResponse.json({ error: 'Already cancelled' }, { status: 409 })
 
-  const { data: adminCheck } = await supabase
+  const { data: adminCheck } = await adminSupabase
     .from('group_members')
     .select('id')
     .eq('group_id', teeTime.group_id)

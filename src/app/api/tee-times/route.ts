@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   const { data: upcomingRaw, error: upcomingError } = await adminSupabase
     .from('tee_times')
     .select(`
-      id, date, start_time, course, max_slots, notes, deleted_at, created_at,
+      id, date, start_time, course, max_slots, notes, deleted_at, created_at, group_id,
       rsvps (
         id, status, note,
         member:group_members ( id, invited_name, profiles ( name ) )
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
   const { data: pastRaw, error: pastError } = await adminSupabase
     .from('tee_times')
     .select(`
-      id, date, start_time, course, max_slots, notes, deleted_at, created_at,
+      id, date, start_time, course, max_slots, notes, deleted_at, created_at, group_id,
       rsvps (
         id, status, note,
         member:group_members ( id, invited_name, profiles ( name ) )

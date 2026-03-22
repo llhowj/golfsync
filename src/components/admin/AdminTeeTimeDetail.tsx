@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { authFetch } from '@/lib/auth-fetch'
 import {
@@ -24,6 +24,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 interface RsvpEntry {
@@ -48,8 +49,15 @@ interface TeeTime {
   rsvps: RsvpEntry[]
 }
 
+interface BackupMember {
+  id: string
+  invited_name: string | null
+  profiles: { name: string } | null
+}
+
 interface AdminTeeTimeDetailProps {
   teeTime: TeeTime
+  groupId: string
   onClose: () => void
   onRefresh: () => void
 }
@@ -73,12 +81,54 @@ function formatTime(timeStr: string): string {
   return `${displayHour}:${minuteStr} ${ampm}`
 }
 
-export function AdminTeeTimeDetail({ teeTime, onClose, onRefresh }: AdminTeeTimeDetailProps) {
+export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: AdminTeeTimeDetailProps) {
   const [cancelling, setCancelling] = useState(false)
+  const [backups, setBackups] = useState<BackupMember[]>([])
+  const [selectedBackup, setSelectedBackup] = useState('')
+  const [inviting, setInviting] = useState(false)
 
   const inPlayers = teeTime.rsvps.filter((r) => r.status === 'in')
   const pendingPlayers = teeTime.rsvps.filter((r) => r.status === 'pending')
   const outPlayers = teeTime.rsvps.filter((r) => r.status === 'out')
+  const openSlots = teeTime.max_slots - inPlayers.length
+
+  // Invited member IDs (already have an invite)
+  const invitedMemberIds = new Set(teeTime.rsvps.map((r) => r.member?.id).filter(Boolean))
+
+  useEffect(() => {
+    if (openSlots <= 0) return
+    authFetch(`/api/members?groupId=${groupId}`)
+      .then(r => r.json())
+      .then(data => {
+        const available = (data.members ?? []).filter(
+          (m: BackupMember & { player_type: string }) =>
+            m.player_type === 'backup' && !invitedMemberIds.has(m.id)
+        )
+        setBackups(available)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, openSlots])
+
+  async function handleInviteBackup() {
+    if (!selectedBackup) return
+    setInviting(true)
+    try {
+      const res = await authFetch(`/api/tee-times/${teeTime.id}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: selectedBackup }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed to invite player.'); return }
+      toast.success('Backup player invited.')
+      setSelectedBackup('')
+      onRefresh()
+    } catch {
+      toast.error('Network error — please try again.')
+    } finally {
+      setInviting(false)
+    }
+  }
 
   async function handleCancel() {
     setCancelling(true)
@@ -191,6 +241,34 @@ export function AdminTeeTimeDetail({ teeTime, onClose, onRefresh }: AdminTeeTime
             <p className="text-sm text-muted-foreground text-center py-4">
               No RSVPs yet.
             </p>
+          )}
+
+          {/* Invite backup */}
+          {!teeTime.deleted_at && openSlots > 0 && backups.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Invite Backup Player
+                </p>
+                <div className="flex gap-2">
+                  <Select value={selectedBackup} onValueChange={setSelectedBackup}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select backup player..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {backups.map((m) => {
+                        const name = (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)?.name ?? m.invited_name ?? 'Unknown'
+                        return <SelectItem key={m.id} value={m.id}>{name}</SelectItem>
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleInviteBackup} disabled={!selectedBackup || inviting} size="sm">
+                    {inviting ? 'Inviting...' : 'Invite'}
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
 
           <Separator />

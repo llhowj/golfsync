@@ -28,6 +28,7 @@ interface TeeTimeWithRsvps {
   max_slots: number
   notes: string | null
   deleted_at: string | null
+  group_id: string
   rsvps: RsvpWithMember[]
 }
 
@@ -156,6 +157,7 @@ export function AdminDashboard({ groupId, memberId }: AdminDashboardProps) {
       {selectedTeeTime && (
         <AdminTeeTimeDetail
           teeTime={selectedTeeTime}
+          groupId={selectedTeeTime.group_id}
           onClose={() => setSelectedTeeTime(null)}
           onRefresh={fetchTeeTimes}
         />
