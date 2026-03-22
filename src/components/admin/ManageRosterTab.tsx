@@ -48,6 +48,8 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
   const [editForm, setEditForm] = useState(EMPTY_FORM)
   const [editError, setEditError] = useState<string | null>(null)
   const [editSaving, setEditSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const fetchMembers = useCallback(async () => {
     setLoading(true)
@@ -124,6 +126,26 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
       phone: m.profiles?.phone ?? '',
       playerType: m.player_type,
     })
+  }
+
+  async function handleDelete() {
+    if (!editMember) return
+    setDeleting(true)
+    try {
+      const res = await authFetch('/api/members', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: editMember.id, groupId }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed to remove player.'); return }
+      toast.success(`${displayName(editMember)} removed from the roster.`)
+      setEditMember(null)
+      setConfirmDelete(false)
+      fetchMembers()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   async function handleEdit() {
@@ -268,19 +290,38 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
       </Dialog>
 
       {/* Edit Player Dialog */}
-      <Dialog open={!!editMember} onOpenChange={open => { if (!open) setEditMember(null) }}>
+      <Dialog open={!!editMember} onOpenChange={open => { if (!open) { setEditMember(null); setConfirmDelete(false) } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Edit Player</DialogTitle></DialogHeader>
-          <PlayerForm
-            form={editForm}
-            onChange={setEditForm}
-            error={editError}
-            isActive={!!editMember && isActive(editMember)}
-          />
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditMember(null)} disabled={editSaving}>Cancel</Button>
-            <Button onClick={handleEdit} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save Changes'}</Button>
-          </DialogFooter>
+          {confirmDelete ? (
+            <div className="space-y-4 py-2">
+              <p className="text-sm">
+                Remove <strong>{editMember && displayName(editMember)}</strong> from the group? This cannot be undone.
+              </p>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>Cancel</Button>
+                <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? 'Removing...' : 'Remove Player'}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <>
+              <PlayerForm
+                form={editForm}
+                onChange={setEditForm}
+                error={editError}
+                isActive={!!editMember && isActive(editMember)}
+              />
+              <DialogFooter className="gap-2 flex-wrap">
+                <Button variant="destructive" className="sm:mr-auto" onClick={() => setConfirmDelete(true)} disabled={editSaving}>
+                  Remove
+                </Button>
+                <Button variant="outline" onClick={() => setEditMember(null)} disabled={editSaving}>Cancel</Button>
+                <Button onClick={handleEdit} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save Changes'}</Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

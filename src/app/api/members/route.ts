@@ -172,6 +172,44 @@ export async function PUT(request: NextRequest) {
   return NextResponse.json({ ok: true })
 }
 
+// DELETE /api/members — remove a player from the group
+export async function DELETE(request: NextRequest) {
+  const user = await getUserFromRequest(request)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await request.json()
+  const { memberId, groupId } = body
+
+  if (!memberId || !groupId) {
+    return NextResponse.json({ error: 'memberId and groupId required' }, { status: 400 })
+  }
+
+  const adminSupabase = createAdminClient()
+
+  const { data: adminCheck } = await adminSupabase
+    .from('group_members')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .eq('is_admin', true)
+    .maybeSingle()
+
+  if (!adminCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // Prevent removing yourself (the admin)
+  if (memberId === adminCheck.id) {
+    return NextResponse.json({ error: 'You cannot remove yourself from the group.' }, { status: 400 })
+  }
+
+  const { error } = await adminSupabase
+    .from('group_members')
+    .delete()
+    .eq('id', memberId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
 // PATCH /api/members — update backup rank order
 export async function PATCH(request: NextRequest) {
   const user = await getUserFromRequest(request)
