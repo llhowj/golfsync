@@ -125,7 +125,7 @@ export async function PUT(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { memberId, groupId, name, email, phone, playerType } = body
+  const { memberId, groupId, name, email, phone, playerType, isAdmin } = body
 
   if (!memberId || !groupId) {
     return NextResponse.json({ error: 'memberId and groupId required' }, { status: 400 })
@@ -152,9 +152,10 @@ export async function PUT(request: NextRequest) {
 
   if (!member) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
 
-  // Update group_members row (player_type always; name/email only if not yet registered)
+  // Update group_members row
   const memberUpdate: Record<string, unknown> = {}
   if (playerType) memberUpdate.player_type = playerType
+  if (typeof isAdmin === 'boolean') memberUpdate.is_admin = isAdmin
   if (!member.user_id) {
     if (name) memberUpdate.invited_name = name.trim()
     if (email) memberUpdate.invited_email = email.trim().toLowerCase()

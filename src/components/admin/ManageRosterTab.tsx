@@ -31,7 +31,7 @@ interface ManageRosterTabProps {
   groupId: string
 }
 
-const EMPTY_FORM = { name: '', email: '', phone: '', playerType: 'core' }
+const EMPTY_FORM = { name: '', email: '', phone: '', playerType: 'core', isAdmin: false }
 
 export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
   const [members, setMembers] = useState<Member[]>([])
@@ -120,11 +120,13 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
   function openEdit(m: Member) {
     setEditMember(m)
     setEditError(null)
+    setConfirmDelete(false)
     setEditForm({
       name: displayName(m),
       email: displayEmail(m),
       phone: m.profiles?.phone ?? '',
       playerType: m.player_type,
+      isAdmin: m.is_admin,
     })
   }
 
@@ -165,6 +167,7 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
           email: editForm.email.trim().toLowerCase(),
           phone: editForm.phone.trim() || null,
           playerType: editForm.playerType,
+          isAdmin: editForm.isAdmin,
         }),
       })
       const data = await res.json()
@@ -312,6 +315,7 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
                 onChange={setEditForm}
                 error={editError}
                 isActive={!!editMember && isActive(editMember)}
+                showAdminToggle
               />
               <DialogFooter className="gap-2 flex-wrap">
                 <Button variant="destructive" className="sm:mr-auto" onClick={() => setConfirmDelete(true)} disabled={editSaving}>
@@ -331,13 +335,14 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
 // ── Shared form fields ────────────────────────────────────────────────────────
 
 interface PlayerFormProps {
-  form: { name: string; email: string; phone: string; playerType: string }
-  onChange: (f: { name: string; email: string; phone: string; playerType: string }) => void
+  form: { name: string; email: string; phone: string; playerType: string; isAdmin: boolean }
+  onChange: (f: { name: string; email: string; phone: string; playerType: string; isAdmin: boolean }) => void
   error: string | null
-  isActive: boolean  // if true, name/email are read-only (player manages their own account)
+  isActive: boolean
+  showAdminToggle?: boolean
 }
 
-function PlayerForm({ form, onChange, error, isActive }: PlayerFormProps) {
+function PlayerForm({ form, onChange, error, isActive, showAdminToggle }: PlayerFormProps) {
   return (
     <div className="space-y-4 py-2">
       {error && (
@@ -375,6 +380,17 @@ function PlayerForm({ form, onChange, error, isActive }: PlayerFormProps) {
           </SelectContent>
         </Select>
       </div>
+      {showAdminToggle && (
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-border accent-primary"
+            checked={form.isAdmin}
+            onChange={e => onChange({ ...form, isAdmin: e.target.checked })}
+          />
+          <span className="text-sm">Admin — can create and manage tee times</span>
+        </label>
+      )}
     </div>
   )
 }
