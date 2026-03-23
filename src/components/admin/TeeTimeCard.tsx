@@ -96,7 +96,10 @@ export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
             {rsvps.map((rsvp, i) => {
               const profile = Array.isArray(rsvp.member?.profiles) ? rsvp.member.profiles[0] : rsvp.member?.profiles
               const name = rsvp.member?.invited_name ?? profile?.name ?? 'Player'
-              const initials = (name.trim()[0] ?? '?').toUpperCase()
+              const parts = name.trim().split(/\s+/)
+              const initials = parts.length >= 2
+                ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+                : (parts[0][0] ?? '?').toUpperCase()
 
               const statusColor =
                 rsvp.status === 'in'
@@ -113,7 +116,7 @@ export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
                     title={rsvp.note
                     ? `${name}: ${rsvp.status === 'requested_in' ? 'requested in' : rsvp.status} — "${rsvp.note}"`
                     : `${name}: ${rsvp.status === 'requested_in' ? 'requested in' : rsvp.status}`}
-                    className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-semibold ring-1 ${statusColor}`}
+                    className={`h-7 w-auto min-w-7 px-1.5 rounded-full flex items-center justify-center text-[10px] font-semibold ring-1 ${statusColor}`}
                   >
                     {initials}
                   </div>
