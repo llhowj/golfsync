@@ -6,7 +6,7 @@ import { RSVPCard } from '@/components/player/RSVPCard'
 import { authFetch } from '@/lib/auth-fetch'
 
 interface RsvpStatus {
-  status: 'in' | 'out' | 'pending'
+  status: 'in' | 'out' | 'pending' | 'requested_in'
   note: string | null
 }
 
@@ -20,9 +20,11 @@ interface PlayerTeeTime {
   date: string
   start_time: string
   course: string
+  max_slots: number
   group_name: string
   myRsvp: RsvpStatus
   confirmedPlayers: ConfirmedPlayer[]
+  pendingPlayers: string[]
 }
 
 interface PlayerDashboardProps {
@@ -92,10 +94,13 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
       throw new Error(data.error)
     }
 
+    const effective = data.effectiveStatus ?? status
     if (status === null) {
       toast.success('Note saved.')
+    } else if (effective === 'requested_in') {
+      toast.success("Request sent — the admin will approve or decline.")
     } else {
-      toast.success(status === 'in' ? "You're in! See you on the course." : "Got it — you're out.")
+      toast.success(effective === 'in' ? "You're in! See you on the course." : "Got it — you're out.")
     }
 
     // Refetch to get the authoritative list of confirmed players
@@ -148,6 +153,7 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
                   teeTime={tt}
                   myRsvp={tt.myRsvp}
                   confirmedPlayers={tt.confirmedPlayers}
+                  pendingPlayers={tt.pendingPlayers}
                   onRsvp={(status, note) => handleRsvp(tt.id, status, note)}
                 />
               ))}

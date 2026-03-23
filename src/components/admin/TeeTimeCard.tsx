@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 
 interface RsvpEntry {
   id?: string
-  status: 'in' | 'out' | 'pending'
+  status: 'in' | 'out' | 'pending' | 'requested_in'
   note?: string | null
   member: {
     id?: string
@@ -51,6 +51,7 @@ function formatTime(timeStr: string): string {
 export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
   const confirmedCount = rsvps.filter((r) => r.status === 'in').length
   const pendingCount = rsvps.filter((r) => r.status === 'pending').length
+  const requestedCount = rsvps.filter((r) => r.status === 'requested_in').length
   const outCount = rsvps.filter((r) => r.status === 'out').length
   const hasOpenSlot = confirmedCount < teeTime.max_slots
   const isPast = new Date(teeTime.date) < new Date(new Date().toDateString())
@@ -102,12 +103,16 @@ export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
                   ? 'bg-green-100 text-green-700 ring-green-300'
                   : rsvp.status === 'out'
                   ? 'bg-red-100 text-red-700 ring-red-300'
+                  : rsvp.status === 'requested_in'
+                  ? 'bg-amber-100 text-amber-700 ring-amber-300'
                   : 'bg-muted text-muted-foreground ring-border'
 
               return (
                 <div key={rsvp.id ?? i} className="relative">
                   <div
-                    title={rsvp.note ? `${name}: ${rsvp.status} — "${rsvp.note}"` : `${name}: ${rsvp.status}`}
+                    title={rsvp.note
+                    ? `${name}: ${rsvp.status === 'requested_in' ? 'requested in' : rsvp.status} — "${rsvp.note}"`
+                    : `${name}: ${rsvp.status === 'requested_in' ? 'requested in' : rsvp.status}`}
                     className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-semibold ring-1 ${statusColor}`}
                   >
                     {initials}
@@ -131,6 +136,11 @@ export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
           {pendingCount > 0 && (
             <span className="flex items-center gap-1">
               <span>–</span> {pendingCount} pending
+            </span>
+          )}
+          {requestedCount > 0 && (
+            <span className="flex items-center gap-1 text-amber-600 font-medium">
+              <span>⏳</span> {requestedCount} requested
             </span>
           )}
           {outCount > 0 && (

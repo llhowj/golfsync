@@ -11,11 +11,12 @@ interface TeeTimeInfo {
   date: string
   start_time: string
   course: string
+  max_slots: number
   notes?: string | null
 }
 
 interface MyRsvp {
-  status: 'in' | 'out' | 'pending'
+  status: 'in' | 'out' | 'pending' | 'requested_in'
   note: string | null
 }
 
@@ -28,6 +29,7 @@ interface RSVPCardProps {
   teeTime: TeeTimeInfo
   myRsvp: MyRsvp
   confirmedPlayers: ConfirmedPlayer[]
+  pendingPlayers?: string[]
   onRsvp: (status: 'in' | 'out' | null, note?: string) => Promise<void>
   isPast?: boolean
 }
@@ -54,6 +56,7 @@ export function RSVPCard({
   teeTime,
   myRsvp,
   confirmedPlayers,
+  pendingPlayers = [],
   onRsvp,
   isPast = false,
 }: RSVPCardProps) {
@@ -95,6 +98,8 @@ export function RSVPCard({
       ? 'You are IN'
       : myRsvp.status === 'out'
       ? 'You are OUT'
+      : myRsvp.status === 'requested_in'
+      ? 'Request pending'
       : 'Awaiting your RSVP'
 
   const statusColor =
@@ -102,9 +107,14 @@ export function RSVPCard({
       ? 'text-green-600'
       : myRsvp.status === 'out'
       ? 'text-red-500'
+      : myRsvp.status === 'requested_in'
+      ? 'text-amber-600'
       : 'text-muted-foreground'
 
   const othersGoing = confirmedPlayers
+
+  const totalIn = confirmedPlayers.length + (myRsvp.status === 'in' ? 1 : 0)
+  const isFull = totalIn >= teeTime.max_slots
 
   function buildGoogleCalendarUrl() {
     const [year, month, day] = teeTime.date.split('-').map(Number)
@@ -140,10 +150,18 @@ export function RSVPCard({
                 ? 'border-green-400 text-green-600 bg-green-50'
                 : myRsvp.status === 'out'
                 ? 'border-red-400 text-red-500 bg-red-50'
+                : myRsvp.status === 'requested_in'
+                ? 'border-amber-400 text-amber-600 bg-amber-50'
                 : 'border-border text-muted-foreground'
             }`}
           >
-            {myRsvp.status === 'in' ? '✓ In' : myRsvp.status === 'out' ? '✕ Out' : 'Pending'}
+            {myRsvp.status === 'in'
+              ? '✓ In'
+              : myRsvp.status === 'out'
+              ? '✕ Out'
+              : myRsvp.status === 'requested_in'
+              ? '⏳ Requested'
+              : 'Pending'}
           </Badge>
         </div>
 
@@ -154,18 +172,28 @@ export function RSVPCard({
           </div>
         )}
 
-        {/* Who else is going */}
-        {othersGoing.length > 0 && (
+        {/* Who else is going / pending */}
+        {(othersGoing.length > 0 || pendingPlayers.length > 0) && (
           <div className="text-sm space-y-1">
-            <div className="text-muted-foreground">
-              <span className="font-medium text-foreground">Also playing: </span>
-              {othersGoing.map((p) => p.name).join(', ')}
-            </div>
-            {othersGoing.filter((p) => p.note).map((p) => (
-              <p key={p.name} className="text-xs text-muted-foreground italic pl-1">
-                {p.name}: &ldquo;{p.note}&rdquo;
-              </p>
-            ))}
+            {othersGoing.length > 0 && (
+              <>
+                <div className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Also playing: </span>
+                  {othersGoing.map((p) => p.name).join(', ')}
+                </div>
+                {othersGoing.filter((p) => p.note).map((p) => (
+                  <p key={p.name} className="text-xs text-muted-foreground italic pl-1">
+                    {p.name}: &ldquo;{p.note}&rdquo;
+                  </p>
+                ))}
+              </>
+            )}
+            {pendingPlayers.length > 0 && (
+              <div className="text-muted-foreground">
+                <span className="font-medium text-foreground">Pending: </span>
+                {pendingPlayers.join(', ')}
+              </div>
+            )}
           </div>
         )}
 
@@ -220,6 +248,16 @@ export function RSVPCard({
         {/* RSVP buttons */}
         {!isPast && (
           <div className="space-y-3">
+            {myRsvp.status === 'requested_in' && (
+              <p className="text-xs text-center text-amber-700 font-medium bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                Your request to rejoin is pending admin approval. Click &ldquo;I&apos;m Out&rdquo; to cancel it.
+              </p>
+            )}
+            {isFull && myRsvp.status !== 'in' && myRsvp.status !== 'requested_in' && (
+              <p className="text-xs text-center text-amber-600 font-medium">
+                This tee time is full — all {teeTime.max_slots} slots are taken.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Button
                 size="lg"
@@ -227,16 +265,20 @@ export function RSVPCard({
                 className={`w-full text-base font-semibold h-14 ${
                   myRsvp.status === 'in'
                     ? 'bg-green-600 hover:bg-green-700 text-white border-green-600'
+                    : myRsvp.status === 'requested_in'
+                    ? 'border-amber-400 text-amber-600 bg-amber-50 cursor-not-allowed'
                     : 'border-green-400 text-green-700 hover:bg-green-50 hover:border-green-500'
                 }`}
                 onClick={() => handleRsvp('in')}
-                disabled={submitting}
+                disabled={submitting || myRsvp.status === 'requested_in' || (isFull && myRsvp.status !== 'in')}
               >
                 {submitting && pendingStatus === 'in' ? (
                   <span className="flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     Saving...
                   </span>
+                ) : myRsvp.status === 'requested_in' ? (
+                  <>⏳ Requested</>
                 ) : (
                   <>✓ I&apos;m In</>
                 )}

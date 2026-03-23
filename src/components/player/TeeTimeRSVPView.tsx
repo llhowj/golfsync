@@ -11,10 +11,11 @@ interface TeeTime {
   date: string
   start_time: string
   course: string
+  max_slots: number
 }
 
 interface MyRsvp {
-  status: 'in' | 'out' | 'pending'
+  status: 'in' | 'out' | 'pending' | 'requested_in'
   note: string | null
 }
 
@@ -27,6 +28,7 @@ interface TeeTimeRSVPViewProps {
   teeTime: TeeTime
   myRsvp: MyRsvp
   confirmedPlayers: ConfirmedPlayer[]
+  pendingPlayers: string[]
   memberId: string
 }
 
@@ -34,6 +36,7 @@ export function TeeTimeRSVPView({
   teeTime,
   myRsvp: initialRsvp,
   confirmedPlayers: initialConfirmedPlayers,
+  pendingPlayers,
   memberId,
 }: TeeTimeRSVPViewProps) {
   const router = useRouter()
@@ -55,13 +58,16 @@ export function TeeTimeRSVPView({
       throw new Error(data.error)
     }
 
+    const effective = data.effectiveStatus ?? effectiveStatus
     if (status === null) {
       toast.success('Note saved.')
+    } else if (effective === 'requested_in') {
+      toast.success("Request sent — the admin will approve or decline.")
     } else {
-      toast.success(status === 'in' ? "You're in! See you on the course." : "Got it — you're out.")
+      toast.success(effective === 'in' ? "You're in! See you on the course." : "Got it — you're out.")
     }
 
-    setMyRsvp({ status: effectiveStatus as 'in' | 'out' | 'pending', note: note ?? null })
+    setMyRsvp({ status: effective as 'in' | 'out' | 'pending' | 'requested_in', note: note ?? null })
 
     // Refresh server data to get updated confirmed player list
     router.refresh()
@@ -80,6 +86,7 @@ export function TeeTimeRSVPView({
         teeTime={teeTime}
         myRsvp={myRsvp}
         confirmedPlayers={confirmedPlayers}
+        pendingPlayers={pendingPlayers}
         onRsvp={handleRsvp}
       />
     </div>

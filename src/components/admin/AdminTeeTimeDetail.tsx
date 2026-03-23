@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils'
 
 interface RsvpEntry {
   id?: string
-  status: 'in' | 'out' | 'pending'
+  status: 'in' | 'out' | 'pending' | 'requested_in'
   note?: string | null
   member: {
     id?: string
@@ -89,6 +89,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
 
   const inPlayers = teeTime.rsvps.filter((r) => r.status === 'in')
   const pendingPlayers = teeTime.rsvps.filter((r) => r.status === 'pending')
+  const requestedInPlayers = teeTime.rsvps.filter((r) => r.status === 'requested_in')
   const outPlayers = teeTime.rsvps.filter((r) => r.status === 'out')
   const openSlots = teeTime.max_slots - inPlayers.length
 
@@ -113,8 +114,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, openSlots])
 
-  async function handleToggleRsvp(memberId: string, currentStatus: 'in' | 'out' | 'pending') {
-    const newStatus = currentStatus === 'out' ? 'in' : 'out'
+  async function handleSetRsvp(memberId: string, newStatus: 'in' | 'out') {
     setTogglingMemberId(memberId)
     try {
       const res = await authFetch('/api/rsvp', {
@@ -250,7 +250,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                       {r.note && <span className="text-muted-foreground text-xs italic">&ldquo;{r.note}&rdquo;</span>}
                       {memberId && !teeTime.deleted_at && (
                         <button
-                          onClick={() => handleToggleRsvp(memberId, 'in')}
+                          onClick={() => handleSetRsvp(memberId, 'out')}
                           disabled={togglingMemberId === memberId}
                           className="text-xs text-muted-foreground hover:text-red-500 shrink-0"
                         >
@@ -280,13 +280,70 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                       <span>–</span>
                       <span className="flex-1">{name}</span>
                       {memberId && !teeTime.deleted_at && (
-                        <button
-                          onClick={() => handleToggleRsvp(memberId, 'pending')}
-                          disabled={togglingMemberId === memberId}
-                          className="text-xs text-muted-foreground hover:text-red-500 shrink-0"
-                        >
-                          Mark Out
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleSetRsvp(memberId, 'in')}
+                            disabled={togglingMemberId === memberId || openSlots <= 0}
+                            className="text-xs text-muted-foreground hover:text-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={openSlots <= 0 ? 'Tee time is full' : undefined}
+                          >
+                            Mark In
+                          </button>
+                          <button
+                            onClick={() => handleSetRsvp(memberId, 'out')}
+                            disabled={togglingMemberId === memberId}
+                            className="text-xs text-muted-foreground hover:text-red-500"
+                          >
+                            Mark Out
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+
+          {/* Requested In */}
+          {requestedInPlayers.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">
+                Requested In ({requestedInPlayers.length})
+              </p>
+              {openSlots <= 0 && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                  Tee time is full — accepting will require marking someone else out first.
+                </p>
+              )}
+              <ul className="space-y-1.5">
+                {requestedInPlayers.map((r, i) => {
+                  const p = Array.isArray(r.member?.profiles) ? r.member?.profiles[0] : r.member?.profiles
+                  const name = r.member?.invited_name ?? p?.name ?? 'Unknown'
+                  const memberId = r.member?.id
+                  return (
+                    <li key={r.id ?? i} className="flex items-center gap-2 text-sm">
+                      <span className="text-amber-600">⏳</span>
+                      <span className="flex-1 font-medium">{name}</span>
+                      {r.note && <span className="text-muted-foreground text-xs italic">&ldquo;{r.note}&rdquo;</span>}
+                      {memberId && !teeTime.deleted_at && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleSetRsvp(memberId, 'in')}
+                            disabled={togglingMemberId === memberId || openSlots <= 0}
+                            className="text-xs font-medium text-green-700 hover:text-green-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={openSlots <= 0 ? 'No open slots' : undefined}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => handleSetRsvp(memberId, 'out')}
+                            disabled={togglingMemberId === memberId}
+                            className="text-xs text-muted-foreground hover:text-red-500"
+                          >
+                            Decline
+                          </button>
+                        </div>
                       )}
                     </li>
                   )
@@ -313,9 +370,10 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                       {r.note && <span className="text-muted-foreground text-xs italic">&ldquo;{r.note}&rdquo;</span>}
                       {memberId && !teeTime.deleted_at && (
                         <button
-                          onClick={() => handleToggleRsvp(memberId, 'out')}
-                          disabled={togglingMemberId === memberId}
-                          className="text-xs text-muted-foreground hover:text-green-600 shrink-0"
+                          onClick={() => handleSetRsvp(memberId, 'in')}
+                          disabled={togglingMemberId === memberId || openSlots <= 0}
+                          className="text-xs text-muted-foreground hover:text-green-600 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={openSlots <= 0 ? 'Tee time is full' : undefined}
                         >
                           Mark In
                         </button>

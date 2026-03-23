@@ -72,15 +72,16 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
     note: myRsvpData?.note ?? null,
   }
 
-  // Fetch who else is confirmed (status = 'in', not this member)
-  const { data: confirmedRsvps } = await supabase
+  // Fetch who else has RSVPed (in or pending, not this member)
+  const { data: othersRsvps } = await supabase
     .from('rsvps')
-    .select('member_id, note, member:group_members ( invited_name )')
+    .select('member_id, status, note, member:group_members ( invited_name )')
     .eq('tee_time_id', id)
-    .eq('status', 'in')
+    .in('status', ['in', 'pending'])
     .neq('member_id', member.id)
 
-  const confirmedPlayers = (confirmedRsvps ?? [])
+  const confirmedPlayers = (othersRsvps ?? [])
+    .filter((r) => r.status === 'in')
     .map((r) => {
       const m = r.member as { invited_name: string | null } | null
       const name = m?.invited_name ?? null
@@ -88,6 +89,14 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
       return { name, note: r.note ?? null }
     })
     .filter((p): p is { name: string; note: string | null } => p !== null)
+
+  const pendingPlayers = (othersRsvps ?? [])
+    .filter((r) => r.status === 'pending')
+    .map((r) => {
+      const m = r.member as { invited_name: string | null } | null
+      return m?.invited_name ?? null
+    })
+    .filter((name): name is string => name !== null)
 
   return (
     <div className="flex flex-col min-h-full">
@@ -98,6 +107,7 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
           teeTime={teeTime}
           myRsvp={myRsvp}
           confirmedPlayers={confirmedPlayers}
+          pendingPlayers={pendingPlayers}
           memberId={member.id}
         />
       </main>

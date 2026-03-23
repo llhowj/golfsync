@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
 
       const myRsvpEntry = rsvpsForTeeTime.find((r) => r.member_id === memberId)
       const myRsvp = {
-        status: (myRsvpEntry?.status ?? 'pending') as 'in' | 'out' | 'pending',
+        status: (myRsvpEntry?.status ?? 'pending') as 'in' | 'out' | 'pending' | 'requested_in',
         note: myRsvpEntry?.note ?? null,
       }
 
@@ -112,15 +112,24 @@ export async function GET(request: NextRequest) {
           return { name, note: r.note ?? null }
         })
 
+      const pendingPlayers = rsvpsForTeeTime
+        .filter((r) => r.status === 'pending' && r.member_id !== memberId)
+        .map((r) => {
+          const m = r.member as { id: string; invited_name: string | null } | null
+          return m?.invited_name ?? 'Unknown'
+        })
+
       return {
         id: tt.id,
         date: tt.date,
         start_time: tt.start_time,
         course: tt.course,
+        max_slots: tt.max_slots,
         notes: tt.notes,
         group_name: tt.group?.name ?? '',
         myRsvp,
         confirmedPlayers,
+        pendingPlayers,
       }
     })
     .filter(Boolean)

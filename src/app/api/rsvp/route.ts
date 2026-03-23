@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   let body: {
     teeTimeId: string
     memberId: string
-    status: 'in' | 'out'
+    status: 'in' | 'out' | 'pending'
     note?: string
   }
 
@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  if (status !== 'in' && status !== 'out') {
-    return NextResponse.json({ error: 'status must be "in" or "out"' }, { status: 400 })
+  if (status !== 'in' && status !== 'out' && status !== 'pending') {
+    return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }
 
   // Fetch the target member record
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
 
   // Allow if the user owns the member record, or is a group admin
   const isOwnRecord = memberRecord.user_id === user.id
+  let isAdmin = false
   if (!isOwnRecord) {
     const { data: adminCheck } = await supabase
       .from('group_members')
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
     if (!adminCheck) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    isAdmin = true
   }
 
   // Verify the member has an invite for this tee time
@@ -85,6 +87,32 @@ export async function POST(request: NextRequest) {
 
   const previousStatus = existingRsvp?.status ?? 'pending'
 
+  // If a player (not admin) who is 'out' requests to go 'in', convert to a request
+  // that requires admin approval rather than directly changing status.
+  let effectiveStatus: string = status
+  if (status === 'in' && previousStatus === 'out' && isOwnRecord && !isAdmin) {
+    effectiveStatus = 'requested_in'
+  }
+
+  // Enforce max slot limit when actually marking 'in' (admin override or first-time)
+  if (effectiveStatus === 'in' && previousStatus !== 'in') {
+    const { data: teeTime } = await supabase
+      .from('tee_times')
+      .select('max_slots')
+      .eq('id', teeTimeId)
+      .maybeSingle()
+
+    const { count: inCount } = await supabase
+      .from('rsvps')
+      .select('id', { count: 'exact', head: true })
+      .eq('tee_time_id', teeTimeId)
+      .eq('status', 'in')
+
+    if ((inCount ?? 0) >= (teeTime?.max_slots ?? 4)) {
+      return NextResponse.json({ error: 'This tee time is full — no open slots remaining.' }, { status: 409 })
+    }
+  }
+
   // Upsert the RSVP
   const { data: rsvp, error: upsertError } = await supabase
     .from('rsvps')
@@ -92,7 +120,8 @@ export async function POST(request: NextRequest) {
       {
         tee_time_id: teeTimeId,
         member_id: memberId,
-        status,
+        // Cast needed until Supabase types are regenerated after migration
+        status: effectiveStatus as 'in' | 'out' | 'pending',
         note: note?.trim() || null,
         updated_at: new Date().toISOString(),
       },
@@ -110,40 +139,35 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Detect changed RSVP (was 'in', now 'out') — notify admin
-  if (previousStatus === 'in' && status === 'out') {
-    // Fetch admin members of the group to notify
+  // Notify admins when player requests to rejoin after being 'out'
+  if (effectiveStatus === 'requested_in') {
     const { data: admins } = await supabase
       .from('group_members')
       .select('id, invited_name, invited_email')
       .eq('group_id', memberRecord.group_id)
       .eq('is_admin', true)
 
-    // Stub: log the notification — email sending via Resend wired up in a later step
     console.log(
-      `[rsvp POST] TODO: notify admins that ${memberRecord.invited_name ?? 'a player'} changed RSVP from 'in' to 'out' for tee time ${teeTimeId}.`,
-      'Admin members:',
-      admins?.map((a) => a.invited_email).join(', '),
+      `[rsvp POST] ${memberRecord.invited_name ?? 'A player'} requested to rejoin tee time ${teeTimeId}.`,
     )
 
-    // Record a notification entry in the DB for tracking
     if (admins && admins.length > 0) {
-      const notifInserts = admins.map((admin) => ({
-        member_id: admin.id,
-        tee_time_id: teeTimeId,
-        type: 'rsvp_change' as const,
-        channel: 'email' as const,
-        payload: {
-          changed_by_name: memberRecord.invited_name,
-          from_status: previousStatus,
-          to_status: status,
-          note: note ?? null,
-        },
-      }))
-
-      await supabase.from('notifications').insert(notifInserts)
+      await supabase.from('notifications').insert(
+        admins.map((admin) => ({
+          member_id: admin.id,
+          tee_time_id: teeTimeId,
+          type: 'rsvp_change' as const,
+          channel: 'email' as const,
+          payload: {
+            changed_by_name: memberRecord.invited_name,
+            from_status: previousStatus,
+            to_status: 'requested_in',
+            note: note ?? null,
+          },
+        }))
+      )
     }
   }
 
-  return NextResponse.json({ rsvp })
+  return NextResponse.json({ rsvp, effectiveStatus })
 }
