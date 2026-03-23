@@ -55,13 +55,17 @@ export function RSVPCard({
   const [showNote, setShowNote] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<'in' | 'out' | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [showCalendarReminder, setShowCalendarReminder] = useState(false)
 
   async function handleRsvp(status: 'in' | 'out') {
     if (submitting) return
+    const wasIn = myRsvp.status === 'in'
     setPendingStatus(status)
     setSubmitting(true)
     try {
       await onRsvp(status, note.trim() || undefined)
+      if (wasIn && status === 'out') setShowCalendarReminder(true)
+      else setShowCalendarReminder(false)
     } finally {
       setSubmitting(false)
       setPendingStatus(null)
@@ -147,6 +151,32 @@ export function RSVPCard({
             </a>
           )}
         </div>
+
+        {/* Calendar reminder */}
+        {showCalendarReminder && (
+          <div className="flex items-start justify-between gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+            <span>
+              Did you add this to Google Calendar?{' '}
+              <a
+                href="https://calendar.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 font-medium"
+              >
+                Open Google Calendar
+              </a>{' '}
+              to remove it.
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowCalendarReminder(false)}
+              className="shrink-0 text-amber-600 hover:text-amber-900 font-bold leading-none"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Note from previous RSVP */}
         {myRsvp.note && !showNote && (
