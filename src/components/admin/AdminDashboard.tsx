@@ -71,9 +71,15 @@ export function AdminDashboard({ groupId, memberId }: AdminDashboardProps) {
       const res = await authFetch(`/api/tee-times?groupId=${groupId}`)
       if (res.ok) {
         const data = await res.json()
-        setTeeTimes(data.upcoming ?? [])
-        setPastTeeTimes(data.past ?? [])
+        const upcoming = data.upcoming ?? []
+        const past = data.past ?? []
+        setTeeTimes(upcoming)
+        setPastTeeTimes(past)
         setGroupInfo(data.group ?? null)
+        // Keep the open detail dialog in sync with fresh data
+        setSelectedTeeTime(prev =>
+          prev ? ([...upcoming, ...past].find(tt => tt.id === prev.id) ?? prev) : null
+        )
       }
     } finally {
       setLoading(false)

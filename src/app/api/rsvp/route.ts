@@ -33,15 +33,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'status must be "in" or "out"' }, { status: 400 })
   }
 
-  // Verify the memberId belongs to the requesting user
+  // Fetch the target member record
   const { data: memberRecord } = await supabase
     .from('group_members')
     .select('id, user_id, group_id, invited_name')
     .eq('id', memberId)
     .maybeSingle()
 
-  if (!memberRecord || memberRecord.user_id !== user.id) {
+  if (!memberRecord) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Allow if the user owns the member record, or is a group admin
+  const isOwnRecord = memberRecord.user_id === user.id
+  if (!isOwnRecord) {
+    const { data: adminCheck } = await supabase
+      .from('group_members')
+      .select('id')
+      .eq('group_id', memberRecord.group_id)
+      .eq('user_id', user.id)
+      .eq('is_admin', true)
+      .maybeSingle()
+
+    if (!adminCheck) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
   }
 
   // Verify the member has an invite for this tee time

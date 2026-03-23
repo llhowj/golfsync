@@ -85,6 +85,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
   const [backups, setBackups] = useState<BackupMember[]>([])
   const [selectedBackup, setSelectedBackup] = useState('')
   const [inviting, setInviting] = useState(false)
+  const [togglingMemberId, setTogglingMemberId] = useState<string | null>(null)
 
   const inPlayers = teeTime.rsvps.filter((r) => r.status === 'in')
   const pendingPlayers = teeTime.rsvps.filter((r) => r.status === 'pending')
@@ -111,6 +112,28 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, openSlots])
+
+  async function handleToggleRsvp(memberId: string, currentStatus: 'in' | 'out' | 'pending') {
+    const newStatus = currentStatus === 'out' ? 'in' : 'out'
+    setTogglingMemberId(memberId)
+    try {
+      const res = await authFetch('/api/rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teeTimeId: teeTime.id, memberId, status: newStatus }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        toast.error(data.error ?? 'Failed to update RSVP.')
+        return
+      }
+      onRefresh()
+    } catch {
+      toast.error('Network error — please try again.')
+    } finally {
+      setTogglingMemberId(null)
+    }
+  }
 
   async function handleInviteBackup() {
     if (!selectedBackup) return
@@ -216,15 +239,27 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                 In ({inPlayers.length})
               </p>
               <ul className="space-y-1.5">
-                {inPlayers.map((r, i) => (
-                  <li key={r.id ?? i} className="flex items-center gap-2 text-sm">
-                    <span className="text-green-600">✓</span>
-                    <span className="font-medium">{(() => { const p = Array.isArray(r.member?.profiles) ? r.member.profiles[0] : r.member?.profiles; return r.member?.invited_name ?? p?.name ?? 'Unknown' })()}</span>
-                    {r.note && (
-                      <span className="text-muted-foreground text-xs italic">&ldquo;{r.note}&rdquo;</span>
-                    )}
-                  </li>
-                ))}
+                {inPlayers.map((r, i) => {
+                  const p = Array.isArray(r.member?.profiles) ? r.member?.profiles[0] : r.member?.profiles
+                  const name = r.member?.invited_name ?? p?.name ?? 'Unknown'
+                  const memberId = r.member?.id
+                  return (
+                    <li key={r.id ?? i} className="flex items-center gap-2 text-sm">
+                      <span className="text-green-600">✓</span>
+                      <span className="font-medium flex-1">{name}</span>
+                      {r.note && <span className="text-muted-foreground text-xs italic">&ldquo;{r.note}&rdquo;</span>}
+                      {memberId && !teeTime.deleted_at && (
+                        <button
+                          onClick={() => handleToggleRsvp(memberId, 'in')}
+                          disabled={togglingMemberId === memberId}
+                          className="text-xs text-muted-foreground hover:text-red-500 shrink-0"
+                        >
+                          Mark Out
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )}
@@ -236,12 +271,26 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                 Pending ({pendingPlayers.length})
               </p>
               <ul className="space-y-1.5">
-                {pendingPlayers.map((r, i) => (
-                  <li key={r.id ?? i} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>–</span>
-                    <span>{(() => { const p = Array.isArray(r.member?.profiles) ? r.member.profiles[0] : r.member?.profiles; return r.member?.invited_name ?? p?.name ?? 'Unknown' })()}</span>
-                  </li>
-                ))}
+                {pendingPlayers.map((r, i) => {
+                  const p = Array.isArray(r.member?.profiles) ? r.member?.profiles[0] : r.member?.profiles
+                  const name = r.member?.invited_name ?? p?.name ?? 'Unknown'
+                  const memberId = r.member?.id
+                  return (
+                    <li key={r.id ?? i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>–</span>
+                      <span className="flex-1">{name}</span>
+                      {memberId && !teeTime.deleted_at && (
+                        <button
+                          onClick={() => handleToggleRsvp(memberId, 'pending')}
+                          disabled={togglingMemberId === memberId}
+                          className="text-xs text-muted-foreground hover:text-red-500 shrink-0"
+                        >
+                          Mark Out
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )}
@@ -253,15 +302,27 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                 Out ({outPlayers.length})
               </p>
               <ul className="space-y-1.5">
-                {outPlayers.map((r, i) => (
-                  <li key={r.id ?? i} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="text-red-500">✕</span>
-                    <span>{(() => { const p = Array.isArray(r.member?.profiles) ? r.member.profiles[0] : r.member?.profiles; return r.member?.invited_name ?? p?.name ?? 'Unknown' })()}</span>
-                    {r.note && (
-                      <span className="text-muted-foreground text-xs italic">&ldquo;{r.note}&rdquo;</span>
-                    )}
-                  </li>
-                ))}
+                {outPlayers.map((r, i) => {
+                  const p = Array.isArray(r.member?.profiles) ? r.member?.profiles[0] : r.member?.profiles
+                  const name = r.member?.invited_name ?? p?.name ?? 'Unknown'
+                  const memberId = r.member?.id
+                  return (
+                    <li key={r.id ?? i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="text-red-500">✕</span>
+                      <span className="flex-1">{name}</span>
+                      {r.note && <span className="text-muted-foreground text-xs italic">&ldquo;{r.note}&rdquo;</span>}
+                      {memberId && !teeTime.deleted_at && (
+                        <button
+                          onClick={() => handleToggleRsvp(memberId, 'out')}
+                          disabled={togglingMemberId === memberId}
+                          className="text-xs text-muted-foreground hover:text-green-600 shrink-0"
+                        >
+                          Mark In
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )}
