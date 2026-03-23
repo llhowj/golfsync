@@ -93,6 +93,9 @@ export function AdminDashboard({ groupId, memberId }: AdminDashboardProps) {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
+          <a href="/dashboard" className="text-xs text-muted-foreground hover:text-foreground mb-1 inline-flex items-center gap-1">
+            ← My Tee Times
+          </a>
           <p className="text-sm text-muted-foreground">Admin Dashboard</p>
           <h1 className="text-2xl font-bold tracking-tight">
             {groupInfo?.name ?? 'Your Group'}

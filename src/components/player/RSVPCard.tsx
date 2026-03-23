@@ -30,6 +30,7 @@ interface RSVPCardProps {
   myRsvp: MyRsvp
   confirmedPlayers: ConfirmedPlayer[]
   pendingPlayers?: string[]
+  invitedBy?: string | null
   onRsvp: (status: 'in' | 'out' | null, note?: string) => Promise<void>
   isPast?: boolean
 }
@@ -57,6 +58,7 @@ export function RSVPCard({
   myRsvp,
   confirmedPlayers,
   pendingPlayers = [],
+  invitedBy,
   onRsvp,
   isPast = false,
 }: RSVPCardProps) {
@@ -142,6 +144,11 @@ export function RSVPCard({
             <p className="text-sm text-muted-foreground mt-0.5">
               {formatTime(teeTime.start_time)} &bull; {teeTime.course}
             </p>
+            {invitedBy && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Invited by: {invitedBy}
+              </p>
+            )}
           </div>
           <Badge
             variant="outline"

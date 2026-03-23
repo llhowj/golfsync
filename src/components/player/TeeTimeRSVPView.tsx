@@ -29,6 +29,7 @@ interface TeeTimeRSVPViewProps {
   myRsvp: MyRsvp
   confirmedPlayers: ConfirmedPlayer[]
   pendingPlayers: string[]
+  invitedBy?: string | null
   memberId: string
 }
 
@@ -37,6 +38,7 @@ export function TeeTimeRSVPView({
   myRsvp: initialRsvp,
   confirmedPlayers: initialConfirmedPlayers,
   pendingPlayers,
+  invitedBy,
   memberId,
 }: TeeTimeRSVPViewProps) {
   const router = useRouter()
@@ -87,6 +89,7 @@ export function TeeTimeRSVPView({
         myRsvp={myRsvp}
         confirmedPlayers={confirmedPlayers}
         pendingPlayers={pendingPlayers}
+        invitedBy={invitedBy}
         onRsvp={handleRsvp}
       />
     </div>

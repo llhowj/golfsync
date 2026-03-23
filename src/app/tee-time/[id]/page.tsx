@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
 import { TeeTimeRSVPView } from '@/components/player/TeeTimeRSVPView'
 
@@ -11,74 +12,64 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect(`/login?redirectTo=/tee-time/${id}`)
 
-  if (!user) {
-    redirect(`/login?redirectTo=/tee-time/${id}`)
-  }
+  // Find any member record for this user that has an invite to this tee time
+  const adminSupabase = createAdminClient()
 
-  // Find the member record for this user
-  const { data: member } = await supabase
-    .from('group_members')
-    .select('id, group_id, invited_name, player_type')
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (!member) {
-    redirect('/dashboard')
-  }
-
-  // Fetch the tee time
-  const { data: teeTime, error: ttError } = await supabase
+  // Fetch the tee time first (need group_id and created_by)
+  const { data: teeTime, error: ttError } = await adminSupabase
     .from('tee_times')
-    .select('id, date, start_time, course, max_slots, notes, deleted_at, group_id')
+    .select('id, date, start_time, course, max_slots, notes, deleted_at, group_id, created_by')
     .eq('id', id)
     .single()
 
-  if (ttError || !teeTime) {
-    redirect('/dashboard')
-  }
+  if (ttError || !teeTime) redirect('/dashboard')
 
-  // Verify the tee time belongs to the user's group
-  if (teeTime.group_id !== member.group_id) {
-    redirect('/dashboard')
-  }
+  // Find the member record for this user in the tee time's group
+  const { data: member } = await adminSupabase
+    .from('group_members')
+    .select('id, group_id, invited_name, player_type')
+    .eq('user_id', user.id)
+    .eq('group_id', teeTime.group_id)
+    .maybeSingle()
 
-  // Fetch this member's invite for this tee time
-  const { data: invite } = await supabase
+  if (!member) redirect('/dashboard')
+
+  // Fetch this member's invite
+  const { data: invite } = await adminSupabase
     .from('invites')
-    .select('id, invite_type')
+    .select('id')
     .eq('tee_time_id', id)
     .eq('member_id', member.id)
     .maybeSingle()
 
-  if (!invite) {
-    // Not invited — redirect to dashboard
-    redirect('/dashboard')
-  }
+  if (!invite) redirect('/dashboard')
 
-  // Fetch this member's RSVP
-  const { data: myRsvpData } = await supabase
-    .from('rsvps')
-    .select('status, note')
-    .eq('tee_time_id', id)
-    .eq('member_id', member.id)
-    .maybeSingle()
+  // Fetch RSVP, other RSVPs, and creator profile in parallel
+  const [{ data: myRsvpData }, { data: othersRsvps }, { data: creatorProfile }] = await Promise.all([
+    adminSupabase
+      .from('rsvps')
+      .select('status, note')
+      .eq('tee_time_id', id)
+      .eq('member_id', member.id)
+      .maybeSingle(),
+    adminSupabase
+      .from('rsvps')
+      .select('member_id, status, note, member:group_members ( invited_name )')
+      .eq('tee_time_id', id)
+      .in('status', ['in', 'pending'])
+      .neq('member_id', member.id),
+    teeTime.created_by
+      ? adminSupabase.from('profiles').select('name').eq('id', teeTime.created_by).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
 
   const myRsvp = {
-    status: (myRsvpData?.status ?? 'pending') as 'in' | 'out' | 'pending',
+    status: (myRsvpData?.status ?? 'pending') as 'in' | 'out' | 'pending' | 'requested_in',
     note: myRsvpData?.note ?? null,
   }
-
-  // Fetch who else has RSVPed (in or pending, not this member)
-  const { data: othersRsvps } = await supabase
-    .from('rsvps')
-    .select('member_id, status, note, member:group_members ( invited_name )')
-    .eq('tee_time_id', id)
-    .in('status', ['in', 'pending'])
-    .neq('member_id', member.id)
 
   const confirmedPlayers = (othersRsvps ?? [])
     .filter((r) => r.status === 'in')
@@ -98,16 +89,19 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
     })
     .filter((name): name is string => name !== null)
 
+  // Use teeTime without created_by in the prop (TeeTimeRSVPView doesn't need it)
+  const { created_by: _cb, ...teeTimeProps } = teeTime
+
   return (
     <div className="flex flex-col min-h-full">
       <Navbar user={user} />
-
       <main className="flex-1 max-w-xl w-full mx-auto px-4 py-8 sm:px-6">
         <TeeTimeRSVPView
-          teeTime={teeTime}
+          teeTime={teeTimeProps}
           myRsvp={myRsvp}
           confirmedPlayers={confirmedPlayers}
           pendingPlayers={pendingPlayers}
+          invitedBy={creatorProfile?.name ?? null}
           memberId={member.id}
         />
       </main>

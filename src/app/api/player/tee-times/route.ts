@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       `
       id,
       tee_time:tee_times (
-        id, date, start_time, course, max_slots, notes, deleted_at, group_id,
+        id, date, start_time, course, max_slots, notes, deleted_at, group_id, created_by,
         group:groups ( name )
       )
     `,
@@ -50,34 +50,45 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ teeTimes: [] })
   }
 
-  // Collect all tee time IDs
+  // Collect all tee time IDs and creator user IDs
   const teeTimeIds = invites
     .map((inv) => (inv.tee_time as { id: string } | null)?.id)
     .filter(Boolean) as string[]
 
-  // Fetch all RSVPs for those tee times (to show who else is going)
-  const { data: allRsvps, error: rsvpError } = await supabase
-    .from('rsvps')
-    .select(
-      `
-      id, tee_time_id, member_id, status, note,
-      member:group_members ( id, invited_name )
-    `,
-    )
-    .in('tee_time_id', teeTimeIds)
+  const creatorIds = [
+    ...new Set(
+      invites
+        .map((inv) => (inv.tee_time as { created_by?: string } | null)?.created_by)
+        .filter(Boolean) as string[]
+    ),
+  ]
+
+  // Fetch creator profiles and RSVPs in parallel
+  const [{ data: creatorProfiles }, { data: allRsvps, error: rsvpError }] = await Promise.all([
+    supabase.from('profiles').select('id, name').in('id', creatorIds),
+    supabase
+      .from('rsvps')
+      .select('id, tee_time_id, member_id, status, note, member:group_members ( id, invited_name )')
+      .in('tee_time_id', teeTimeIds),
+  ])
 
   if (rsvpError) {
     console.error('[player/tee-times GET] RSVP fetch error:', rsvpError.message)
   }
 
-  const rsvpsByTeeTime = (allRsvps ?? []).reduce<
-    Record<string, typeof allRsvps>
-  >((acc, rsvp) => {
-    const key = rsvp.tee_time_id
-    if (!acc[key]) acc[key] = []
-    acc[key]!.push(rsvp)
-    return acc
-  }, {})
+  const creatorNameById = Object.fromEntries(
+    (creatorProfiles ?? []).map((p) => [p.id, p.name])
+  )
+
+  const rsvpsByTeeTime = (allRsvps ?? []).reduce<Record<string, typeof allRsvps>>(
+    (acc, rsvp) => {
+      const key = rsvp.tee_time_id
+      if (!acc[key]) acc[key] = []
+      acc[key]!.push(rsvp)
+      return acc
+    },
+    {}
+  )
 
   // Build the response shape
   const teeTimes = invites
@@ -91,6 +102,7 @@ export async function GET(request: NextRequest) {
         notes: string | null
         deleted_at: string | null
         group_id: string
+        created_by: string | null
         group: { name: string } | null
       } | null
 
@@ -119,14 +131,17 @@ export async function GET(request: NextRequest) {
           return m?.invited_name ?? 'Unknown'
         })
 
+      const invitedBy = tt.created_by ? (creatorNameById[tt.created_by] ?? null) : null
+
       return {
         id: tt.id,
+        member_id: memberId,
         date: tt.date,
         start_time: tt.start_time,
         course: tt.course,
         max_slots: tt.max_slots,
         notes: tt.notes,
-        group_name: tt.group?.name ?? '',
+        invited_by: invitedBy,
         myRsvp,
         confirmedPlayers,
         pendingPlayers,

@@ -17,28 +17,19 @@ interface ConfirmedPlayer {
 
 interface PlayerTeeTime {
   id: string
+  member_id: string
   date: string
   start_time: string
   course: string
   max_slots: number
-  group_name: string
+  invited_by: string | null
   myRsvp: RsvpStatus
   confirmedPlayers: ConfirmedPlayer[]
   pendingPlayers: string[]
 }
 
 interface PlayerDashboardProps {
-  memberId: string
-}
-
-function formatDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const date = new Date(year, month - 1, day)
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  })
+  memberIds: string[]
 }
 
 function SkeletonCard() {
@@ -56,22 +47,47 @@ function SkeletonCard() {
   )
 }
 
-export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
+export function PlayerDashboard({ memberIds }: PlayerDashboardProps) {
   const [teeTimes, setTeeTimes] = useState<PlayerTeeTime[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchTeeTimes = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await authFetch(`/api/player/tee-times?memberId=${memberId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setTeeTimes(data.teeTimes ?? [])
+      const results = await Promise.all(
+        memberIds.map((memberId) =>
+          authFetch(`/api/player/tee-times?memberId=${memberId}`)
+            .then((res) => (res.ok ? res.json() : { teeTimes: [] }))
+            .then((data) => (data.teeTimes ?? []) as PlayerTeeTime[])
+        )
+      )
+
+      // Flatten and deduplicate by tee time id (keep first occurrence)
+      const seen = new Set<string>()
+      const combined: PlayerTeeTime[] = []
+      for (const list of results) {
+        for (const tt of list) {
+          if (!seen.has(tt.id)) {
+            seen.add(tt.id)
+            combined.push(tt)
+          }
+        }
       }
+
+      // Sort: upcoming first (ascending), then past (descending)
+      const today = new Date().toISOString().split('T')[0]!
+      const upcoming = combined
+        .filter((tt) => tt.date >= today)
+        .sort((a, b) => a.date.localeCompare(b.date))
+      const past = combined
+        .filter((tt) => tt.date < today)
+        .sort((a, b) => b.date.localeCompare(a.date))
+
+      setTeeTimes([...upcoming, ...past])
     } finally {
       setLoading(false)
     }
-  }, [memberId])
+  }, [memberIds])
 
   useEffect(() => {
     fetchTeeTimes()
@@ -80,6 +96,7 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
   async function handleRsvp(teeTimeId: string, status: 'in' | 'out' | null, note?: string) {
     const tt = teeTimes.find((t) => t.id === teeTimeId)
     const effectiveStatus = status ?? tt?.myRsvp.status ?? 'pending'
+    const memberId = tt?.member_id
 
     const res = await authFetch('/api/rsvp', {
       method: 'POST',
@@ -103,19 +120,12 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
       toast.success(effective === 'in' ? "You're in! See you on the course." : "Got it — you're out.")
     }
 
-    // Refetch to get the authoritative list of confirmed players
     await fetchTeeTimes()
   }
 
-  const upcoming = teeTimes.filter((tt) => {
-    const [y, m, d] = tt.date.split('-').map(Number)
-    return new Date(y, m - 1, d) >= new Date(new Date().toDateString())
-  })
-
-  const past = teeTimes.filter((tt) => {
-    const [y, m, d] = tt.date.split('-').map(Number)
-    return new Date(y, m - 1, d) < new Date(new Date().toDateString())
-  })
+  const today = new Date().toISOString().split('T')[0]!
+  const upcoming = teeTimes.filter((tt) => tt.date >= today)
+  const past = teeTimes.filter((tt) => tt.date < today)
 
   return (
     <div className="space-y-6">
@@ -154,6 +164,7 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
                   myRsvp={tt.myRsvp}
                   confirmedPlayers={tt.confirmedPlayers}
                   pendingPlayers={tt.pendingPlayers}
+                  invitedBy={tt.invited_by}
                   onRsvp={(status, note) => handleRsvp(tt.id, status, note)}
                 />
               ))}
@@ -171,6 +182,8 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
                   teeTime={tt}
                   myRsvp={tt.myRsvp}
                   confirmedPlayers={tt.confirmedPlayers}
+                  pendingPlayers={tt.pendingPlayers}
+                  invitedBy={tt.invited_by}
                   onRsvp={(status, note) => handleRsvp(tt.id, status ?? null, note)}
                   isPast
                 />
