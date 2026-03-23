@@ -256,7 +256,10 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
           <div key={m.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
             <span className="text-sm font-mono text-muted-foreground w-5 shrink-0 text-center">{index + 1}</span>
             <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{displayName(m)}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium truncate">{displayName(m)}</p>
+                {m.is_admin && <Badge variant="secondary" className="text-xs shrink-0">Admin</Badge>}
+              </div>
               <p className="text-sm text-muted-foreground truncate">{displayEmail(m)}</p>
             </div>
             <Badge variant={isActive(m) ? 'default' : 'outline'} className="shrink-0 text-xs">
