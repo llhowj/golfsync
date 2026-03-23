@@ -132,7 +132,7 @@ export function RSVPCard({
         {/* Who else is going */}
         {othersGoing.length > 0 && (
           <div className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Also going: </span>
+            <span className="font-medium text-foreground">Also playing: </span>
             {othersGoing.join(', ')}
           </div>
         )}
