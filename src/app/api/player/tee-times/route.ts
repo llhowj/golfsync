@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       `
       id,
       tee_time:tee_times (
-        id, date, start_time, course, max_slots, deleted_at, group_id,
+        id, date, start_time, course, max_slots, notes, deleted_at, group_id,
         group:groups ( name )
       )
     `,
@@ -88,6 +88,7 @@ export async function GET(request: NextRequest) {
         start_time: string
         course: string
         max_slots: number
+        notes: string | null
         deleted_at: string | null
         group_id: string
         group: { name: string } | null
@@ -107,15 +108,16 @@ export async function GET(request: NextRequest) {
         .filter((r) => r.status === 'in' && r.member_id !== memberId)
         .map((r) => {
           const m = r.member as { id: string; invited_name: string | null } | null
-          return m?.invited_name ?? 'Unknown'
+          const name = m?.invited_name ?? 'Unknown'
+          return { name, note: r.note ?? null }
         })
-        .filter(Boolean)
 
       return {
         id: tt.id,
         date: tt.date,
         start_time: tt.start_time,
         course: tt.course,
+        notes: tt.notes,
         group_name: tt.group?.name ?? '',
         myRsvp,
         confirmedPlayers,

@@ -105,12 +105,16 @@ export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
                   : 'bg-muted text-muted-foreground ring-border'
 
               return (
-                <div
-                  key={rsvp.id ?? i}
-                  title={`${name}: ${rsvp.status}`}
-                  className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-semibold ring-1 ${statusColor}`}
-                >
-                  {initials}
+                <div key={rsvp.id ?? i} className="relative">
+                  <div
+                    title={rsvp.note ? `${name}: ${rsvp.status} — "${rsvp.note}"` : `${name}: ${rsvp.status}`}
+                    className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-semibold ring-1 ${statusColor}`}
+                  >
+                    {initials}
+                  </div>
+                  {rsvp.note && (
+                    <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-blue-500 ring-1 ring-white" />
+                  )}
                 </div>
               )
             })}

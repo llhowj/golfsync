@@ -11,6 +11,7 @@ interface TeeTimeInfo {
   date: string
   start_time: string
   course: string
+  notes?: string | null
 }
 
 interface MyRsvp {
@@ -18,11 +19,16 @@ interface MyRsvp {
   note: string | null
 }
 
+interface ConfirmedPlayer {
+  name: string
+  note: string | null
+}
+
 interface RSVPCardProps {
   teeTime: TeeTimeInfo
   myRsvp: MyRsvp
-  confirmedPlayers: string[]
-  onRsvp: (status: 'in' | 'out', note?: string) => Promise<void>
+  confirmedPlayers: ConfirmedPlayer[]
+  onRsvp: (status: 'in' | 'out' | null, note?: string) => Promise<void>
   isPast?: boolean
 }
 
@@ -72,6 +78,18 @@ export function RSVPCard({
     }
   }
 
+  async function handleSaveNote() {
+    if (submitting) return
+    setPendingStatus(null)
+    setSubmitting(true)
+    try {
+      await onRsvp(null, note.trim() || undefined)
+      setShowNote(false)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const statusLabel =
     myRsvp.status === 'in'
       ? 'You are IN'
@@ -86,7 +104,7 @@ export function RSVPCard({
       ? 'text-red-500'
       : 'text-muted-foreground'
 
-  const othersGoing = confirmedPlayers.filter((name) => name !== undefined)
+  const othersGoing = confirmedPlayers
 
   function buildGoogleCalendarUrl() {
     const [year, month, day] = teeTime.date.split('-').map(Number)
@@ -129,11 +147,25 @@ export function RSVPCard({
           </Badge>
         </div>
 
+        {/* Admin note */}
+        {teeTime.notes && (
+          <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Note: </span>{teeTime.notes}
+          </div>
+        )}
+
         {/* Who else is going */}
         {othersGoing.length > 0 && (
-          <div className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Also playing: </span>
-            {othersGoing.join(', ')}
+          <div className="text-sm space-y-1">
+            <div className="text-muted-foreground">
+              <span className="font-medium text-foreground">Also playing: </span>
+              {othersGoing.map((p) => p.name).join(', ')}
+            </div>
+            {othersGoing.filter((p) => p.note).map((p) => (
+              <p key={p.name} className="text-xs text-muted-foreground italic pl-1">
+                {p.name}: &ldquo;{p.note}&rdquo;
+              </p>
+            ))}
           </div>
         )}
 
@@ -252,9 +284,18 @@ export function RSVPCard({
                   rows={2}
                   className="resize-none text-sm"
                 />
-                <p className="text-xs text-muted-foreground text-right">
-                  {note.length}/140
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">{note.length}/140</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSaveNote}
+                    disabled={submitting}
+                  >
+                    {submitting && pendingStatus === null ? 'Saving...' : 'Save Note'}
+                  </Button>
+                </div>
               </div>
             )}
           </div>

@@ -10,6 +10,11 @@ interface RsvpStatus {
   note: string | null
 }
 
+interface ConfirmedPlayer {
+  name: string
+  note: string | null
+}
+
 interface PlayerTeeTime {
   id: string
   date: string
@@ -17,7 +22,7 @@ interface PlayerTeeTime {
   course: string
   group_name: string
   myRsvp: RsvpStatus
-  confirmedPlayers: string[]
+  confirmedPlayers: ConfirmedPlayer[]
 }
 
 interface PlayerDashboardProps {
@@ -70,11 +75,14 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
     fetchTeeTimes()
   }, [fetchTeeTimes])
 
-  async function handleRsvp(teeTimeId: string, status: 'in' | 'out', note?: string) {
+  async function handleRsvp(teeTimeId: string, status: 'in' | 'out' | null, note?: string) {
+    const tt = teeTimes.find((t) => t.id === teeTimeId)
+    const effectiveStatus = status ?? tt?.myRsvp.status ?? 'pending'
+
     const res = await authFetch('/api/rsvp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teeTimeId, memberId, status, note }),
+      body: JSON.stringify({ teeTimeId, memberId, status: effectiveStatus, note }),
     })
 
     const data = await res.json()
@@ -84,23 +92,11 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
       throw new Error(data.error)
     }
 
-    toast.success(status === 'in' ? "You're in! See you on the course." : "Got it — you're out.")
-
-    // Optimistically update local state
-    setTeeTimes((prev) =>
-      prev.map((tt) =>
-        tt.id === teeTimeId
-          ? {
-              ...tt,
-              myRsvp: { status, note: note ?? null },
-              confirmedPlayers:
-                status === 'in'
-                  ? tt.confirmedPlayers // server will return updated list; refetch for accuracy
-                  : tt.confirmedPlayers,
-            }
-          : tt,
-      ),
-    )
+    if (status === null) {
+      toast.success('Note saved.')
+    } else {
+      toast.success(status === 'in' ? "You're in! See you on the course." : "Got it — you're out.")
+    }
 
     // Refetch to get the authoritative list of confirmed players
     await fetchTeeTimes()
@@ -169,7 +165,7 @@ export function PlayerDashboard({ memberId }: PlayerDashboardProps) {
                   teeTime={tt}
                   myRsvp={tt.myRsvp}
                   confirmedPlayers={tt.confirmedPlayers}
-                  onRsvp={(status, note) => handleRsvp(tt.id, status, note)}
+                  onRsvp={(status, note) => handleRsvp(tt.id, status ?? null, note)}
                   isPast
                 />
               ))}

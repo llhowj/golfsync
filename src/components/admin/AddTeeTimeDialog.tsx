@@ -51,6 +51,7 @@ export function AddTeeTimeDialog({
   const [time, setTime] = useState('08:00')
   const [course, setCourse] = useState(homeCourse)
   const [maxSlots, setMaxSlots] = useState(4)
+  const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,6 +65,7 @@ export function AddTeeTimeDialog({
     setDate(tomorrowStr)
     setTime('08:00')
     setMaxSlots(4)
+    setNotes('')
     setError(null)
     setLoadingMembers(true)
     authFetch(`/api/members?groupId=${groupId}`)
@@ -131,6 +133,7 @@ export function AddTeeTimeDialog({
           course: course.trim(),
           maxSlots,
           inviteeIds,
+          notes: notes.trim() || undefined,
         }),
       })
 
@@ -219,6 +222,19 @@ export function AddTeeTimeDialog({
               onChange={(e) => setMaxSlots(parseInt(e.target.value, 10))}
               required
               disabled={submitting}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="tt-notes">Note for Players <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <textarea
+              id="tt-notes"
+              rows={2}
+              placeholder="e.g. Meet at the driving range 30 min early"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={submitting}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
             />
           </div>
 

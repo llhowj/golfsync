@@ -75,7 +75,7 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
   // Fetch who else is confirmed (status = 'in', not this member)
   const { data: confirmedRsvps } = await supabase
     .from('rsvps')
-    .select('member_id, member:group_members ( invited_name )')
+    .select('member_id, note, member:group_members ( invited_name )')
     .eq('tee_time_id', id)
     .eq('status', 'in')
     .neq('member_id', member.id)
@@ -83,9 +83,11 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
   const confirmedPlayers = (confirmedRsvps ?? [])
     .map((r) => {
       const m = r.member as { invited_name: string | null } | null
-      return m?.invited_name ?? null
+      const name = m?.invited_name ?? null
+      if (!name) return null
+      return { name, note: r.note ?? null }
     })
-    .filter((name): name is string => name !== null)
+    .filter((p): p is { name: string; note: string | null } => p !== null)
 
   return (
     <div className="flex flex-col min-h-full">

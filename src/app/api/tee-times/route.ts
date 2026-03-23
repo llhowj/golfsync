@@ -90,14 +90,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { groupId: string; date: string; time: string; course: string; maxSlots: number; inviteeIds?: string[] }
+  let body: { groupId: string; date: string; time: string; course: string; maxSlots: number; inviteeIds?: string[]; notes?: string }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { groupId, date, time, course, maxSlots, inviteeIds } = body
+  const { groupId, date, time, course, maxSlots, inviteeIds, notes } = body
 
   if (!groupId || !date || !time || !course) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
       start_time: time,
       course: course.trim(),
       max_slots: maxSlots ?? 4,
+      notes: notes?.trim() || null,
       created_by: user.id,
     })
     .select()
@@ -184,6 +185,7 @@ export async function POST(request: NextRequest) {
       startTime: teeTime.start_time,
       course: teeTime.course,
       groupName: groupData?.name ?? 'Your Golf Group',
+      notes: teeTime.notes,
     })
   }
 

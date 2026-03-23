@@ -18,10 +18,15 @@ interface MyRsvp {
   note: string | null
 }
 
+interface ConfirmedPlayer {
+  name: string
+  note: string | null
+}
+
 interface TeeTimeRSVPViewProps {
   teeTime: TeeTime
   myRsvp: MyRsvp
-  confirmedPlayers: string[]
+  confirmedPlayers: ConfirmedPlayer[]
   memberId: string
 }
 
@@ -33,13 +38,14 @@ export function TeeTimeRSVPView({
 }: TeeTimeRSVPViewProps) {
   const router = useRouter()
   const [myRsvp, setMyRsvp] = useState<MyRsvp>(initialRsvp)
-  const [confirmedPlayers, setConfirmedPlayers] = useState<string[]>(initialConfirmedPlayers)
+  const [confirmedPlayers, setConfirmedPlayers] = useState<ConfirmedPlayer[]>(initialConfirmedPlayers)
 
-  async function handleRsvp(status: 'in' | 'out', note?: string) {
+  async function handleRsvp(status: 'in' | 'out' | null, note?: string) {
+    const effectiveStatus = status ?? myRsvp.status ?? 'pending'
     const res = await authFetch('/api/rsvp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teeTimeId: teeTime.id, memberId, status, note }),
+      body: JSON.stringify({ teeTimeId: teeTime.id, memberId, status: effectiveStatus, note }),
     })
 
     const data = await res.json()
@@ -49,11 +55,13 @@ export function TeeTimeRSVPView({
       throw new Error(data.error)
     }
 
-    toast.success(
-      status === 'in' ? "You're in! See you on the course." : "Got it — you're out.",
-    )
+    if (status === null) {
+      toast.success('Note saved.')
+    } else {
+      toast.success(status === 'in' ? "You're in! See you on the course." : "Got it — you're out.")
+    }
 
-    setMyRsvp({ status, note: note ?? null })
+    setMyRsvp({ status: effectiveStatus as 'in' | 'out' | 'pending', note: note ?? null })
 
     // Refresh server data to get updated confirmed player list
     router.refresh()
