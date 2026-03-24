@@ -44,11 +44,12 @@ export async function POST(
 
   if (!adminMember) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Get all RSVP member IDs for this tee time
+  // Get member IDs for players who are confirmed "in" for this tee time
   const { data: rsvps } = await supabase
     .from('rsvps')
     .select('member_id')
     .eq('tee_time_id', teeTimeId)
+    .eq('status', 'in')
 
   const rsvpMemberIds = (rsvps ?? []).map(r => r.member_id)
 
