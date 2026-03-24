@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     supabase.from('profiles').select('id, name').in('id', creatorIds),
     supabase
       .from('rsvps')
-      .select('id, tee_time_id, member_id, status, note, member:group_members ( id, invited_name )')
+      .select('id, tee_time_id, member_id, status, note, member:group_members ( id, invited_name, profiles ( name ) )')
       .in('tee_time_id', teeTimeIds),
   ])
 
@@ -119,16 +119,18 @@ export async function GET(request: NextRequest) {
       const confirmedPlayers = rsvpsForTeeTime
         .filter((r) => r.status === 'in' && r.member_id !== memberId)
         .map((r) => {
-          const m = r.member as { id: string; invited_name: string | null } | null
-          const name = m?.invited_name ?? 'Unknown'
+          const m = r.member as { id: string; invited_name: string | null; profiles: { name: string } | { name: string }[] | null } | null
+          const profile = Array.isArray(m?.profiles) ? m?.profiles[0] : m?.profiles
+          const name = profile?.name ?? m?.invited_name ?? 'Unknown'
           return { name, note: r.note ?? null }
         })
 
       const pendingPlayers = rsvpsForTeeTime
         .filter((r) => r.status === 'pending' && r.member_id !== memberId)
         .map((r) => {
-          const m = r.member as { id: string; invited_name: string | null } | null
-          return m?.invited_name ?? 'Unknown'
+          const m = r.member as { id: string; invited_name: string | null; profiles: { name: string } | { name: string }[] | null } | null
+          const profile = Array.isArray(m?.profiles) ? m?.profiles[0] : m?.profiles
+          return profile?.name ?? m?.invited_name ?? 'Unknown'
         })
 
       const invitedBy = tt.created_by ? (creatorNameById[tt.created_by] ?? null) : null

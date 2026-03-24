@@ -59,6 +59,14 @@ export function AddTeeTimeDialog({
   const [backups, setBackups] = useState<MemberOption[]>([])
   const [loadingMembers, setLoadingMembers] = useState(false)
 
+  // Inline add-to-roster state
+  const [addPlayerOpen, setAddPlayerOpen] = useState(false)
+  const [newPlayerName, setNewPlayerName] = useState('')
+  const [newPlayerEmail, setNewPlayerEmail] = useState('')
+  const [newPlayerType, setNewPlayerType] = useState<'core' | 'backup'>('backup')
+  const [addingPlayer, setAddingPlayer] = useState(false)
+  const [addPlayerError, setAddPlayerError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!open) return
     setCourse(homeCourse)
@@ -67,6 +75,11 @@ export function AddTeeTimeDialog({
     setMaxSlots(4)
     setNotes('')
     setError(null)
+    setAddPlayerOpen(false)
+    setNewPlayerName('')
+    setNewPlayerEmail('')
+    setNewPlayerType('backup')
+    setAddPlayerError(null)
     setLoadingMembers(true)
     authFetch(`/api/members?groupId=${groupId}`)
       .then(r => r.json())
@@ -102,7 +115,6 @@ export function AddTeeTimeDialog({
   }
 
   function getSlotOptions(slot: Slot): Array<{ id: string; label: string }> {
-    // Other selected backup IDs (exclude this slot)
     const usedBackupIds = new Set(
       slots
         .filter(s => s.corePlayerId !== slot.corePlayerId && s.selectedId !== s.corePlayerId && s.selectedId !== 'none')
@@ -113,6 +125,50 @@ export function AddTeeTimeDialog({
       ...backups.filter(b => !usedBackupIds.has(b.id)).map(b => ({ id: b.id, label: b.name })),
       { id: 'none', label: 'None' },
     ]
+  }
+
+  async function handleAddPlayer() {
+    setAddPlayerError(null)
+    if (!newPlayerName.trim() || !newPlayerEmail.trim()) {
+      setAddPlayerError('Name and email are required.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newPlayerEmail)) {
+      setAddPlayerError('Please enter a valid email address.')
+      return
+    }
+    setAddingPlayer(true)
+    try {
+      const res = await authFetch('/api/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          groupId,
+          name: newPlayerName.trim(),
+          email: newPlayerEmail.trim().toLowerCase(),
+          playerType: newPlayerType,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setAddPlayerError(data.error ?? 'Failed to add player.'); return }
+
+      const newId = data.member?.id
+      const newName = newPlayerName.trim()
+
+      if (newPlayerType === 'core') {
+        setSlots(prev => [...prev, { corePlayerId: newId, coreName: newName, selectedId: newId }])
+      } else {
+        setBackups(prev => [...prev, { id: newId, name: newName, type: 'backup' }])
+      }
+
+      toast.success(`${newName} added to roster.`)
+      setAddPlayerOpen(false)
+      setNewPlayerName('')
+      setNewPlayerEmail('')
+      setNewPlayerType('backup')
+    } finally {
+      setAddingPlayer(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -274,6 +330,73 @@ export function AddTeeTimeDialog({
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {/* Inline add-to-roster */}
+            {!loadingMembers && !addPlayerOpen && (
+              <button
+                type="button"
+                onClick={() => setAddPlayerOpen(true)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
+              >
+                + Add new player to roster
+              </button>
+            )}
+
+            {addPlayerOpen && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2 mt-1">
+                <p className="text-xs font-medium">Add to roster</p>
+                {addPlayerError && (
+                  <p className="text-xs text-destructive">{addPlayerError}</p>
+                )}
+                <Input
+                  placeholder="Name"
+                  value={newPlayerName}
+                  onChange={e => setNewPlayerName(e.target.value)}
+                  className="h-8 text-sm"
+                  disabled={addingPlayer}
+                />
+                <Input
+                  placeholder="Email"
+                  type="email"
+                  value={newPlayerEmail}
+                  onChange={e => setNewPlayerEmail(e.target.value)}
+                  className="h-8 text-sm"
+                  disabled={addingPlayer}
+                />
+                <Select
+                  value={newPlayerType}
+                  onValueChange={(v) => setNewPlayerType(v as 'core' | 'backup')}
+                  disabled={addingPlayer}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="core">Core Player</SelectItem>
+                    <SelectItem value="backup">Backup Player</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddPlayer}
+                    disabled={addingPlayer}
+                  >
+                    {addingPlayer ? 'Adding...' : 'Add to Roster'}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => { setAddPlayerOpen(false); setAddPlayerError(null) }}
+                    disabled={addingPlayer}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             )}
           </div>

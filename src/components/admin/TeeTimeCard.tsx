@@ -95,7 +95,7 @@ export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
           <div className="flex items-center gap-2 flex-wrap">
             {rsvps.map((rsvp, i) => {
               const profile = Array.isArray(rsvp.member?.profiles) ? rsvp.member.profiles[0] : rsvp.member?.profiles
-              const name = rsvp.member?.invited_name ?? profile?.name ?? 'Player'
+              const name = profile?.name ?? rsvp.member?.invited_name ?? 'Player'
               const parts = name.trim().split(/\s+/)
               const initials = parts.length >= 2
                 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()

@@ -241,7 +241,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
               <ul className="space-y-1.5">
                 {inPlayers.map((r, i) => {
                   const p = Array.isArray(r.member?.profiles) ? r.member?.profiles[0] : r.member?.profiles
-                  const name = r.member?.invited_name ?? p?.name ?? 'Unknown'
+                  const name = p?.name ?? r.member?.invited_name ?? 'Unknown'
                   const memberId = r.member?.id
                   return (
                     <li key={r.id ?? i} className="flex items-center gap-2 text-sm">
@@ -273,7 +273,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
               <ul className="space-y-1.5">
                 {pendingPlayers.map((r, i) => {
                   const p = Array.isArray(r.member?.profiles) ? r.member?.profiles[0] : r.member?.profiles
-                  const name = r.member?.invited_name ?? p?.name ?? 'Unknown'
+                  const name = p?.name ?? r.member?.invited_name ?? 'Unknown'
                   const memberId = r.member?.id
                   return (
                     <li key={r.id ?? i} className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -319,7 +319,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
               <ul className="space-y-1.5">
                 {requestedInPlayers.map((r, i) => {
                   const p = Array.isArray(r.member?.profiles) ? r.member?.profiles[0] : r.member?.profiles
-                  const name = r.member?.invited_name ?? p?.name ?? 'Unknown'
+                  const name = p?.name ?? r.member?.invited_name ?? 'Unknown'
                   const memberId = r.member?.id
                   return (
                     <li key={r.id ?? i} className="flex items-center gap-2 text-sm">
@@ -361,7 +361,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
               <ul className="space-y-1.5">
                 {outPlayers.map((r, i) => {
                   const p = Array.isArray(r.member?.profiles) ? r.member?.profiles[0] : r.member?.profiles
-                  const name = r.member?.invited_name ?? p?.name ?? 'Unknown'
+                  const name = p?.name ?? r.member?.invited_name ?? 'Unknown'
                   const memberId = r.member?.id
                   return (
                     <li key={r.id ?? i} className="flex items-center gap-2 text-sm text-muted-foreground">
