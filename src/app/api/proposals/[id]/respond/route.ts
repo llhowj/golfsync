@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserFromRequest } from '@/lib/get-user'
+import { sendProposalDeclinedEmail, sendProposalAcceptedEmail } from '@/lib/email'
 
 export async function POST(
   request: NextRequest,
@@ -54,12 +55,70 @@ export async function POST(
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
 
-  // Declined → immediately reject the proposal
+  // Helper: fetch admin email + player name + original tee time for notifications
+  async function getNotificationData() {
+    const { data: teeTime } = await supabase
+      .from('tee_times')
+      .select('date, start_time, course, group_id')
+      .eq('id', proposal.tee_time_id)
+      .single()
+
+    if (!teeTime) return null
+
+    const { data: adminMember } = await supabase
+      .from('group_members')
+      .select('user_id, profiles(name, email), groups(name)')
+      .eq('group_id', teeTime.group_id)
+      .eq('is_admin', true)
+      .maybeSingle()
+
+    const { data: playerMember } = await supabase
+      .from('group_members')
+      .select('invited_name, profiles(name, email)')
+      .eq('id', memberId)
+      .maybeSingle()
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adminProfile = Array.isArray((adminMember as any)?.profiles) ? (adminMember as any).profiles[0] : (adminMember as any)?.profiles
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const groupData = Array.isArray((adminMember as any)?.groups) ? (adminMember as any).groups[0] : (adminMember as any)?.groups
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const playerProfile = Array.isArray((playerMember as any)?.profiles) ? (playerMember as any).profiles[0] : (playerMember as any)?.profiles
+
+    const adminEmail = adminProfile?.email
+    const adminName = adminProfile?.name ?? 'Admin'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const playerName = playerProfile?.name ?? (playerMember as any)?.invited_name ?? 'A player'
+
+    if (!adminEmail) return null
+
+    return {
+      admin: { name: adminName, email: adminEmail },
+      player: { name: playerName, email: '' },
+      emailData: {
+        teeTimeId: proposal.tee_time_id,
+        originalDate: teeTime.date,
+        originalTime: teeTime.start_time,
+        originalCourse: teeTime.course,
+        proposedDate: proposal.proposed_date,
+        proposedTime: proposal.proposed_start_time,
+        proposedCourse: proposal.proposed_course,
+        groupName: groupData?.name ?? 'Your Golf Group',
+      },
+    }
+  }
+
+  // Declined → immediately reject the proposal and notify admin
   if (response === 'no') {
     await db
       .from('tee_time_proposals')
       .update({ status: 'rejected' })
       .eq('id', proposalId)
+
+    const notif = await getNotificationData()
+    if (notif) {
+      await sendProposalDeclinedEmail(notif.admin, notif.player, notif.emailData)
+    }
 
     return NextResponse.json({ status: 'rejected' })
   }
@@ -88,6 +147,11 @@ export async function POST(
       .from('tee_time_proposals')
       .update({ status: 'accepted' })
       .eq('id', proposalId)
+
+    const notif = await getNotificationData()
+    if (notif) {
+      await sendProposalAcceptedEmail(notif.admin, notif.emailData)
+    }
 
     return NextResponse.json({ status: 'accepted' })
   }

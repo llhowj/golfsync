@@ -181,6 +181,87 @@ export async function sendPlayerInviteEmail(
   })
 }
 
+// ── Proposal response alerts to admin ────────────────────────────────────
+
+interface ProposalEmailData {
+  teeTimeId: string
+  originalDate: string
+  originalTime: string
+  originalCourse: string
+  proposedDate: string
+  proposedTime: string
+  proposedCourse: string
+  groupName: string
+}
+
+export async function sendProposalDeclinedEmail(
+  admin: Recipient,
+  player: Recipient,
+  data: ProposalEmailData
+) {
+  if (!isConfigured()) {
+    console.log('[email] RESEND_API_KEY not set — skipping proposal_declined email')
+    return
+  }
+
+  const dashboardUrl = `${APP_URL}/dashboard?g=${data.teeTimeId}`
+
+  await getResend().emails.send({
+    from: FROM,
+    to: admin.email,
+    subject: `❌ ${player.name} can't make the proposed change — ${formatDate(data.proposedDate)}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="margin-bottom:4px">Proposed Change Declined</h2>
+        <p><strong>${player.name}</strong> can't make the proposed new time for <strong>${data.groupName}</strong>. The tee time was not changed.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td colspan="2" style="padding:4px 0;color:#666;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Original</td></tr>
+          <tr><td style="padding:4px 0;color:#666;width:80px">Date</td><td style="padding:4px 0">${formatDate(data.originalDate)}</td></tr>
+          <tr><td style="padding:4px 0;color:#666">Time</td><td style="padding:4px 0">${formatTime(data.originalTime)}</td></tr>
+          <tr><td style="padding:4px 0;color:#666">Course</td><td style="padding:4px 0">${data.originalCourse}</td></tr>
+          <tr><td colspan="2" style="padding:12px 0 4px;color:#666;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Proposed (not applied)</td></tr>
+          <tr><td style="padding:4px 0;color:#666;width:80px">Date</td><td style="padding:4px 0">${formatDate(data.proposedDate)}</td></tr>
+          <tr><td style="padding:4px 0;color:#666">Time</td><td style="padding:4px 0">${formatTime(data.proposedTime)}</td></tr>
+          <tr><td style="padding:4px 0;color:#666">Course</td><td style="padding:4px 0">${data.proposedCourse}</td></tr>
+        </table>
+        <a href="${dashboardUrl}" style="display:inline-block;background:#18181b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Open Dashboard</a>
+      </div>
+    `,
+  })
+}
+
+export async function sendProposalAcceptedEmail(
+  admin: Recipient,
+  data: ProposalEmailData
+) {
+  if (!isConfigured()) {
+    console.log('[email] RESEND_API_KEY not set — skipping proposal_accepted email')
+    return
+  }
+
+  const dashboardUrl = `${APP_URL}/dashboard?g=${data.teeTimeId}`
+
+  await getResend().emails.send({
+    from: FROM,
+    to: admin.email,
+    subject: `✅ Everyone agreed — tee time updated to ${formatDate(data.proposedDate)}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="margin-bottom:4px">Proposed Change Accepted</h2>
+        <p style="color:#666;margin-top:0">${data.groupName}</p>
+        <p>Everyone agreed to the proposed change. The tee time has been updated.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px 0;color:#666;width:80px">Date</td><td style="padding:8px 0;font-weight:600">${formatDate(data.proposedDate)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Time</td><td style="padding:8px 0;font-weight:600">${formatTime(data.proposedTime)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Course</td><td style="padding:8px 0;font-weight:600">${data.proposedCourse}</td></tr>
+        </table>
+        <p style="font-size:14px;color:#555">Remember to update your calendar.</p>
+        <a href="${dashboardUrl}" style="display:inline-block;background:#18181b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Open Dashboard</a>
+      </div>
+    `,
+  })
+}
+
 // ── RSVP change alert to admin ────────────────────────────────────────────
 
 export async function sendRsvpChangeAlert(
