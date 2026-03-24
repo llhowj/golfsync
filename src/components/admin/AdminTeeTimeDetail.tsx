@@ -103,7 +103,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
       .then(data => {
         const available = (data.members ?? [])
           .filter((m: { id: string; player_type: string }) =>
-            m.player_type === 'backup' && !invitedMemberIds.has(m.id)
+            !invitedMemberIds.has(m.id)
           )
           .map((m: { id: string; invited_name: string | null; profiles: { name: string } | { name: string }[] | null }) => {
             const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
@@ -397,7 +397,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
               <Separator />
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Invite Backup Player
+                  Invite Player
                 </p>
                 <div className="flex gap-2">
                   <Select value={selectedBackup} onValueChange={(v) => setSelectedBackup(v ?? '')}>
@@ -405,7 +405,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                       <SelectValue>
                         {selectedBackup
                           ? (backups.find(m => m.id === selectedBackup)?.name ?? 'Player')
-                          : <span className="text-muted-foreground">Select backup player...</span>}
+                          : <span className="text-muted-foreground">Select player...</span>}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
