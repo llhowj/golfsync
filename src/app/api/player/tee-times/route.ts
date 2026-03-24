@@ -164,6 +164,7 @@ export async function GET(request: NextRequest) {
         max_slots: tt.max_slots,
         notes: tt.notes,
         invited_by: invitedBy,
+        created_by_me: tt.created_by === memberRecord.user_id,
         myRsvp,
         pendingProposal,
         confirmedPlayers,

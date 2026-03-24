@@ -39,6 +39,7 @@ interface RSVPCardProps {
   confirmedPlayers: ConfirmedPlayer[]
   pendingPlayers?: string[]
   invitedBy?: string | null
+  createdByMe?: boolean
   onRsvp: (status: 'in' | 'out' | null, note?: string) => Promise<void>
   isPast?: boolean
   pendingProposal?: PendingProposal | null
@@ -69,6 +70,7 @@ export function RSVPCard({
   confirmedPlayers,
   pendingPlayers = [],
   invitedBy,
+  createdByMe = false,
   onRsvp,
   isPast = false,
   pendingProposal,
@@ -153,7 +155,16 @@ export function RSVPCard({
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="font-semibold">{formatDate(teeTime.date)}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-semibold">{formatDate(teeTime.date)}</p>
+              {createdByMe && (
+                <span title="You set up this tee time" className="inline-flex items-center rounded-full bg-blue-100 p-1 text-blue-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                    <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.589 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 0 1-.332 0C5.26 16.563 2 12.162 2 7a11.8 11.8 0 0 1 .104-1.589.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.749Z" clipRule="evenodd" />
+                  </svg>
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground mt-0.5">
               {formatTime(teeTime.start_time)} &bull; {teeTime.course}
             </p>

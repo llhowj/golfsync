@@ -31,6 +31,7 @@ interface PlayerTeeTime {
   course: string
   max_slots: number
   invited_by: string | null
+  created_by_me: boolean
   myRsvp: RsvpStatus
   confirmedPlayers: ConfirmedPlayer[]
   pendingPlayers: string[]
@@ -195,6 +196,7 @@ export function PlayerDashboard({ memberIds }: PlayerDashboardProps) {
                   confirmedPlayers={tt.confirmedPlayers}
                   pendingPlayers={tt.pendingPlayers}
                   invitedBy={tt.invited_by}
+                  createdByMe={tt.created_by_me}
                   onRsvp={(status, note) => handleRsvp(tt.id, status, note)}
                   pendingProposal={tt.pendingProposal}
                   onProposalResponse={(proposalId, response) => handleProposalResponse(proposalId, response, tt.member_id)}
@@ -216,6 +218,7 @@ export function PlayerDashboard({ memberIds }: PlayerDashboardProps) {
                   confirmedPlayers={tt.confirmedPlayers}
                   pendingPlayers={tt.pendingPlayers}
                   invitedBy={tt.invited_by}
+                  createdByMe={tt.created_by_me}
                   onRsvp={(status, note) => handleRsvp(tt.id, status ?? null, note)}
                   isPast
                 />
