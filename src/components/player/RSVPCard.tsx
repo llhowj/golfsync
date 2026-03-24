@@ -175,7 +175,10 @@ export function RSVPCard({
         {/* Admin note */}
         {teeTime.notes && (
           <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Note: </span>{teeTime.notes}
+            {teeTime.notes}
+            {invitedBy && (
+              <span className="text-xs"> — {invitedBy.split(' ')[0]}</span>
+            )}
           </div>
         )}
 
