@@ -202,6 +202,21 @@ export function AddTeeTimeDialog({
       }
 
       toast.success('Tee time added! Players have been notified.')
+
+      // Auto-add to admin's Google Calendar
+      const [year, month, day] = date.split('-').map(Number)
+      const [hour, minute] = time.split(':').map(Number)
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const start = `${year}${pad(month)}${pad(day)}T${pad(hour)}${pad(minute)}00`
+      const end = `${year}${pad(month)}${pad(day)}T${pad(hour + 5)}${pad(minute)}00`
+      const params = new URLSearchParams({
+        action: 'TEMPLATE',
+        text: `Golf — ${course.trim()}`,
+        dates: `${start}/${end}`,
+        location: course.trim(),
+      })
+      window.open(`https://www.google.com/calendar/render?${params.toString()}`, '_blank')
+
       onSuccess()
     } catch {
       setError('Network error — please try again.')
