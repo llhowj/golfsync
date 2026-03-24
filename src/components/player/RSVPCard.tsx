@@ -25,6 +25,14 @@ interface ConfirmedPlayer {
   note: string | null
 }
 
+interface PendingProposal {
+  id: string
+  proposed_date: string
+  proposed_start_time: string
+  proposed_course: string
+  myResponse: string | null
+}
+
 interface RSVPCardProps {
   teeTime: TeeTimeInfo
   myRsvp: MyRsvp
@@ -33,6 +41,8 @@ interface RSVPCardProps {
   invitedBy?: string | null
   onRsvp: (status: 'in' | 'out' | null, note?: string) => Promise<void>
   isPast?: boolean
+  pendingProposal?: PendingProposal | null
+  onProposalResponse?: (proposalId: string, response: 'yes' | 'no') => Promise<void>
 }
 
 function formatDate(dateStr: string): string {
@@ -61,12 +71,15 @@ export function RSVPCard({
   invitedBy,
   onRsvp,
   isPast = false,
+  pendingProposal,
+  onProposalResponse,
 }: RSVPCardProps) {
   const [note, setNote] = useState(myRsvp.note ?? '')
   const [showNote, setShowNote] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<'in' | 'out' | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [showCalendarReminder, setShowCalendarReminder] = useState(false)
+  const [proposalSubmitting, setProposalSubmitting] = useState(false)
 
   async function handleRsvp(status: 'in' | 'out') {
     if (submitting) return
@@ -253,6 +266,46 @@ export function RSVPCard({
           <p className="text-xs text-muted-foreground italic">
             Your note: &ldquo;{myRsvp.note}&rdquo;
           </p>
+        )}
+
+        {/* Proposed change */}
+        {pendingProposal && !isPast && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 space-y-2">
+            <p className="text-xs font-semibold text-blue-700">Proposed Change</p>
+            <p className="text-sm text-blue-900">
+              {formatDate(pendingProposal.proposed_date)} &bull; {formatTime(pendingProposal.proposed_start_time)} &bull; {pendingProposal.proposed_course}
+            </p>
+            {pendingProposal.myResponse === null && onProposalResponse ? (
+              <div className="flex gap-2 pt-0.5">
+                <button
+                  type="button"
+                  disabled={proposalSubmitting}
+                  onClick={async () => {
+                    setProposalSubmitting(true)
+                    try { await onProposalResponse(pendingProposal.id, 'yes') } finally { setProposalSubmitting(false) }
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  Works for me
+                </button>
+                <button
+                  type="button"
+                  disabled={proposalSubmitting}
+                  onClick={async () => {
+                    setProposalSubmitting(true)
+                    try { await onProposalResponse(pendingProposal.id, 'no') } finally { setProposalSubmitting(false) }
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Can&apos;t make it
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-blue-600">
+                {pendingProposal.myResponse === 'yes' ? '✓ You agreed to this change — waiting on others.' : '✕ You declined this change.'}
+              </p>
+            )}
+          </div>
         )}
 
         {/* RSVP buttons */}

@@ -15,6 +15,14 @@ interface ConfirmedPlayer {
   note: string | null
 }
 
+interface PendingProposal {
+  id: string
+  proposed_date: string
+  proposed_start_time: string
+  proposed_course: string
+  myResponse: string | null
+}
+
 interface PlayerTeeTime {
   id: string
   member_id: string
@@ -26,6 +34,7 @@ interface PlayerTeeTime {
   myRsvp: RsvpStatus
   confirmedPlayers: ConfirmedPlayer[]
   pendingPlayers: string[]
+  pendingProposal: PendingProposal | null
 }
 
 interface PlayerDashboardProps {
@@ -123,6 +132,27 @@ export function PlayerDashboard({ memberIds }: PlayerDashboardProps) {
     await fetchTeeTimes()
   }
 
+  async function handleProposalResponse(proposalId: string, response: 'yes' | 'no', memberId: string) {
+    const res = await authFetch(`/api/proposals/${proposalId}/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response, memberId }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      toast.error(data.error ?? 'Failed to respond.')
+      return
+    }
+    if (data.status === 'accepted') {
+      toast.success("Everyone agreed — the tee time has been updated! Remember to update your calendar.")
+    } else if (data.status === 'rejected') {
+      toast.info("You've declined the proposed change. The admin has been notified.")
+    } else {
+      toast.success("Your response has been recorded.")
+    }
+    await fetchTeeTimes()
+  }
+
   const today = new Date().toISOString().split('T')[0]!
   const upcoming = teeTimes.filter((tt) => tt.date >= today)
   const past = teeTimes.filter((tt) => tt.date < today)
@@ -166,6 +196,8 @@ export function PlayerDashboard({ memberIds }: PlayerDashboardProps) {
                   pendingPlayers={tt.pendingPlayers}
                   invitedBy={tt.invited_by}
                   onRsvp={(status, note) => handleRsvp(tt.id, status, note)}
+                  pendingProposal={tt.pendingProposal}
+                  onProposalResponse={(proposalId, response) => handleProposalResponse(proposalId, response, tt.member_id)}
                 />
               ))}
             </section>

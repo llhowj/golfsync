@@ -63,13 +63,18 @@ export async function GET(request: NextRequest) {
     ),
   ]
 
-  // Fetch creator profiles and RSVPs in parallel
-  const [{ data: creatorProfiles }, { data: allRsvps, error: rsvpError }] = await Promise.all([
+  // Fetch creator profiles, RSVPs, and pending proposals in parallel
+  const [{ data: creatorProfiles }, { data: allRsvps, error: rsvpError }, { data: pendingProposals }] = await Promise.all([
     supabase.from('profiles').select('id, name').in('id', creatorIds),
     supabase
       .from('rsvps')
       .select('id, tee_time_id, member_id, status, note, member:group_members ( id, invited_name, profiles ( name ) )')
       .in('tee_time_id', teeTimeIds),
+    (supabase as any)
+      .from('tee_time_proposals')
+      .select('id, tee_time_id, proposed_date, proposed_start_time, proposed_course, proposal_responses(member_id, response)')
+      .in('tee_time_id', teeTimeIds)
+      .eq('status', 'pending'),
   ])
 
   if (rsvpError) {
@@ -78,6 +83,11 @@ export async function GET(request: NextRequest) {
 
   const creatorNameById = Object.fromEntries(
     (creatorProfiles ?? []).map((p) => [p.id, p.name])
+  )
+
+  const proposalByTeeTime = Object.fromEntries(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((pendingProposals ?? []) as any[]).map((p: any) => [p.tee_time_id, p])
   )
 
   const rsvpsByTeeTime = (allRsvps ?? []).reduce<Record<string, typeof allRsvps>>(
@@ -135,6 +145,16 @@ export async function GET(request: NextRequest) {
 
       const invitedBy = tt.created_by ? (creatorNameById[tt.created_by] ?? null) : null
 
+      const rawProposal = proposalByTeeTime[tt.id]
+      const pendingProposal = rawProposal ? {
+        id: rawProposal.id,
+        proposed_date: rawProposal.proposed_date,
+        proposed_start_time: rawProposal.proposed_start_time,
+        proposed_course: rawProposal.proposed_course,
+        myResponse: (rawProposal.proposal_responses as Array<{ member_id: string; response: string | null }>)
+          .find(r => r.member_id === memberId)?.response ?? null,
+      } : null
+
       return {
         id: tt.id,
         member_id: memberId,
@@ -145,6 +165,7 @@ export async function GET(request: NextRequest) {
         notes: tt.notes,
         invited_by: invitedBy,
         myRsvp,
+        pendingProposal,
         confirmedPlayers,
         pendingPlayers,
       }

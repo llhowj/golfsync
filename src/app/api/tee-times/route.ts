@@ -76,9 +76,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: pastError.message }, { status: 500 })
   }
 
+  // Fetch pending proposals for all these tee times
+  const allTeeTimeIds = [...(upcomingRaw ?? []), ...(pastRaw ?? [])].map(tt => tt.id)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = adminSupabase as any
+  const { data: pendingProposals } = allTeeTimeIds.length > 0
+    ? await db
+        .from('tee_time_proposals')
+        .select('id, tee_time_id, proposed_date, proposed_start_time, proposed_course, proposal_responses(member_id, response)')
+        .in('tee_time_id', allTeeTimeIds)
+        .eq('status', 'pending')
+    : { data: [] }
+
+  const proposalByTeeTime = Object.fromEntries(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((pendingProposals ?? []) as any[]).map((p: any) => [p.tee_time_id, p])
+  )
+
+  const annotate = (tt: { id: string }) => ({
+    ...tt,
+    pendingProposal: proposalByTeeTime[tt.id] ?? null,
+  })
+
   return NextResponse.json({
-    upcoming: upcomingRaw ?? [],
-    past: pastRaw ?? [],
+    upcoming: (upcomingRaw ?? []).map(annotate),
+    past: (pastRaw ?? []).map(annotate),
     group,
   })
 }

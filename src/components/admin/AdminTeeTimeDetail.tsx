@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
@@ -38,6 +40,19 @@ interface RsvpEntry {
   } | null
 }
 
+interface ProposalResponse {
+  member_id: string
+  response: string | null
+}
+
+interface PendingProposal {
+  id: string
+  proposed_date: string
+  proposed_start_time: string
+  proposed_course: string
+  proposal_responses: ProposalResponse[]
+}
+
 interface TeeTime {
   id: string
   date: string
@@ -47,6 +62,7 @@ interface TeeTime {
   notes?: string | null
   deleted_at: string | null
   rsvps: RsvpEntry[]
+  pendingProposal?: PendingProposal | null
 }
 
 interface BackupMember {
@@ -86,6 +102,14 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
   const [selectedBackup, setSelectedBackup] = useState('')
   const [inviting, setInviting] = useState(false)
   const [togglingMemberId, setTogglingMemberId] = useState<string | null>(null)
+
+  // Edit / propose change
+  const [showEdit, setShowEdit] = useState(false)
+  const [editDate, setEditDate] = useState(teeTime.date)
+  const [editTime, setEditTime] = useState(teeTime.start_time.slice(0, 5))
+  const [editCourse, setEditCourse] = useState(teeTime.course)
+  const [proposing, setProposing] = useState(false)
+  const [proposeError, setProposeError] = useState<string | null>(null)
 
   const inPlayers = teeTime.rsvps.filter((r) => r.status === 'in')
   const pendingPlayers = teeTime.rsvps.filter((r) => r.status === 'pending')
@@ -154,6 +178,31 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
       toast.error('Network error — please try again.')
     } finally {
       setInviting(false)
+    }
+  }
+
+  async function handlePropose() {
+    setProposeError(null)
+    setProposing(true)
+    try {
+      const res = await authFetch(`/api/tee-times/${teeTime.id}/propose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: editDate, time: editTime, course: editCourse.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setProposeError(data.error ?? 'Failed to submit change.'); return }
+      if (data.applied) {
+        toast.success('Tee time updated.')
+      } else {
+        toast.success('Change proposed — waiting for players to confirm.')
+      }
+      setShowEdit(false)
+      onRefresh()
+    } catch {
+      setProposeError('Network error — please try again.')
+    } finally {
+      setProposing(false)
     }
   }
 
@@ -233,6 +282,68 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
           {teeTime.notes && (
             <div className="rounded-md bg-muted/50 border border-border px-3 py-2 text-sm text-muted-foreground">
               <span className="font-medium text-foreground">Note: </span>{teeTime.notes}
+            </div>
+          )}
+
+          {/* Pending proposal status */}
+          {teeTime.pendingProposal && (() => {
+            const p = teeTime.pendingProposal!
+            const responses = p.proposal_responses
+            const yesCount = responses.filter(r => r.response === 'yes').length
+            const noCount = responses.filter(r => r.response === 'no').length
+            const total = responses.length
+            return (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 space-y-1.5">
+                <p className="text-xs font-semibold text-blue-700">Proposed Change Awaiting Approval</p>
+                <p className="text-sm">
+                  {formatDate(p.proposed_date)} &bull; {formatTime(p.proposed_start_time)} &bull; {p.proposed_course}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {noCount > 0
+                    ? `Declined by ${noCount} player${noCount > 1 ? 's' : ''} — change will not be applied.`
+                    : `${yesCount}/${total} confirmed`}
+                </p>
+              </div>
+            )
+          })()}
+
+          {/* Edit tee time */}
+          {!teeTime.deleted_at && !showEdit && !teeTime.pendingProposal && (
+            <button
+              type="button"
+              onClick={() => { setShowEdit(true); setProposeError(null) }}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Edit tee time
+            </button>
+          )}
+
+          {showEdit && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Propose Change</p>
+              {proposeError && <p className="text-xs text-destructive">{proposeError}</p>}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Date</Label>
+                  <Input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="h-8 text-sm" disabled={proposing} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Time</Label>
+                  <Input type="time" value={editTime} onChange={e => setEditTime(e.target.value)} className="h-8 text-sm" disabled={proposing} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Course</Label>
+                <Input type="text" value={editCourse} onChange={e => setEditCourse(e.target.value)} className="h-8 text-sm" disabled={proposing} />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handlePropose} disabled={proposing}>
+                  {proposing ? 'Submitting...' : 'Submit Change'}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowEdit(false)} disabled={proposing}>
+                  Cancel
+                </Button>
+              </div>
             </div>
           )}
 

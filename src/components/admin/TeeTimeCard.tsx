@@ -20,6 +20,7 @@ interface TeeTime {
   max_slots: number
   notes?: string | null
   deleted_at: string | null
+  pendingProposal?: { id: string } | null
 }
 
 interface TeeTimeCardProps {
@@ -75,6 +76,11 @@ export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
             <Badge variant="secondary" className="text-xs font-medium">
               {confirmedCount}/{teeTime.max_slots}
             </Badge>
+            {teeTime.pendingProposal && (
+              <Badge variant="outline" className="text-xs border-blue-400 text-blue-600 bg-blue-50">
+                Change Pending
+              </Badge>
+            )}
             {!isPast && hasOpenSlot && (
               <Badge
                 variant="outline"

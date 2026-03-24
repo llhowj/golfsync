@@ -30,6 +30,13 @@ interface TeeTimeWithRsvps {
   deleted_at: string | null
   group_id: string
   rsvps: RsvpWithMember[]
+  pendingProposal?: {
+    id: string
+    proposed_date: string
+    proposed_start_time: string
+    proposed_course: string
+    proposal_responses: Array<{ member_id: string; response: string | null }>
+  } | null
 }
 
 interface GroupInfo {
