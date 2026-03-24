@@ -18,6 +18,7 @@ interface TeeTime {
   start_time: string
   course: string
   max_slots: number
+  notes?: string | null
   deleted_at: string | null
 }
 
@@ -89,6 +90,11 @@ export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
             )}
           </div>
         </div>
+
+        {/* Note */}
+        {teeTime.notes && (
+          <p className="text-xs text-muted-foreground italic">{teeTime.notes}</p>
+        )}
 
         {/* RSVP avatars */}
         {rsvps.length > 0 && (

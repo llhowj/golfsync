@@ -230,6 +230,12 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
             )}
           </div>
 
+          {teeTime.notes && (
+            <div className="rounded-md bg-muted/50 border border-border px-3 py-2 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Note: </span>{teeTime.notes}
+            </div>
+          )}
+
           <Separator />
 
           {/* In */}
