@@ -159,8 +159,8 @@ export function RSVPCard({
               </p>
               {myRsvp.status === 'in' && !isPast && (
                 <a href={buildGoogleCalendarUrl()} target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-muted-foreground underline-offset-4 hover:underline hover:text-foreground">
-                  +&nbsp;Cal
+                  className="text-xs text-blue-600 underline-offset-4 hover:underline hover:text-blue-800">
+                  +&nbsp;Google Cal
                 </a>
               )}
             </div>
