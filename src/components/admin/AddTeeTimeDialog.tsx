@@ -227,9 +227,12 @@ export function AddTeeTimeDialog({
       const pad = (n: number) => String(n).padStart(2, '0')
       const start = `${year}${pad(month)}${pad(day)}T${pad(hour)}${pad(minute)}00`
       const end = `${year}${pad(month)}${pad(day)}T${pad(hour + 5)}${pad(minute)}00`
+      const ampm = hour >= 12 ? 'PM' : 'AM'
+      const displayHour = hour % 12 === 0 ? 12 : hour % 12
+      const formattedTime = `${displayHour}:${pad(minute)} ${ampm}`
       const params = new URLSearchParams({
         action: 'TEMPLATE',
-        text: `Golf — ${course.trim()}`,
+        text: `Golf ${formattedTime} — ${course.trim()}`,
         dates: `${start}/${end}`,
         location: course.trim(),
       })

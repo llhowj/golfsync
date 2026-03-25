@@ -213,7 +213,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
     const end = `${year}${pad(month)}${pad(day)}T${pad(hour + 5)}${pad(minute)}00`
     const params = new URLSearchParams({
       action: 'TEMPLATE',
-      text: `Golf — ${teeTime.course}`,
+      text: `Golf ${formatTime(teeTime.start_time)} — ${teeTime.course}`,
       dates: `${start}/${end}`,
       location: teeTime.course,
     })
