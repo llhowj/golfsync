@@ -11,6 +11,15 @@ function isConfigured() {
   return process.env.RESEND_API_KEY && !process.env.RESEND_API_KEY.startsWith('re_placeholder')
 }
 
+function logEmail(to: string | string[], subject: string, body: Record<string, unknown>) {
+  const recipients = Array.isArray(to) ? to.join(', ') : to
+  console.log('\n📧 [EMAIL — not sent locally]')
+  console.log(`   To:      ${recipients}`)
+  console.log(`   Subject: ${subject}`)
+  console.log('   Data:   ', JSON.stringify(body, null, 2))
+  console.log('')
+}
+
 function formatDate(date: string) {
   return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -45,7 +54,7 @@ export async function sendTeeTimePostedEmails(
   data: TeeTimeEmailData
 ) {
   if (!isConfigured()) {
-    console.log('[email] RESEND_API_KEY not set — skipping tee_time_posted emails')
+    recipients.forEach(r => logEmail(r.email, `⛳ New tee time: ${formatDate(data.date)} at ${data.course}`, { ...data, recipient: r.name }))
     return
   }
 
@@ -90,7 +99,7 @@ export async function sendTeeTimeCancelledEmails(
   data: TeeTimeEmailData
 ) {
   if (!isConfigured()) {
-    console.log('[email] RESEND_API_KEY not set — skipping tee_time_deleted emails')
+    recipients.forEach(r => logEmail(r.email, `Cancelled: ${formatDate(data.date)} at ${data.course}`, { ...data, recipient: r.name }))
     return
   }
 
@@ -125,7 +134,7 @@ export async function sendDeadlineAlert(
   openSlots: number
 ) {
   if (!isConfigured()) {
-    console.log('[email] RESEND_API_KEY not set — skipping deadline_alert email')
+    logEmail(admin.email, `⚠️ 48-hour deadline: ${openSlots} open slot(s) on ${formatDate(data.date)}`, { ...data, openSlots })
     return
   }
 
@@ -159,7 +168,7 @@ export async function sendPlayerInviteEmail(
   groupName: string,
 ) {
   if (!isConfigured()) {
-    console.log('[email] RESEND_API_KEY not set — skipping player_invite email')
+    logEmail(recipient.email, `You've been invited to ${groupName} on GolfSync`, { recipient: recipient.name, groupName })
     return
   }
 
@@ -181,6 +190,49 @@ export async function sendPlayerInviteEmail(
   })
 }
 
+// ── Proposal notification to players ─────────────────────────────────────
+
+export async function sendProposalNotificationEmails(
+  recipients: Recipient[],
+  data: ProposalEmailData
+) {
+  if (!isConfigured()) {
+    recipients.forEach(r => logEmail(r.email, `⏳ Proposed change to your tee time on ${formatDate(data.originalDate)}`, { recipient: r.name, ...data }))
+    return
+  }
+
+  const teeTimeUrl = `${APP_URL}/tee-time/${data.teeTimeId}`
+
+  await Promise.allSettled(
+    recipients.map(({ name, email }) =>
+      getResend().emails.send({
+        from: FROM,
+        to: email,
+        subject: `⏳ Proposed change to your tee time on ${formatDate(data.originalDate)}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+            <h2 style="margin-bottom:4px">Proposed Tee Time Change</h2>
+            <p style="color:#666;margin-top:0">${data.groupName}</p>
+            <p>Hi ${name}, your admin has proposed a change to an upcoming tee time. Please let them know if the new time works for you.</p>
+            <table style="width:100%;border-collapse:collapse;margin:16px 0">
+              <tr><td colspan="2" style="padding:4px 0;color:#666;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Original</td></tr>
+              <tr><td style="padding:4px 0;color:#666;width:80px">Date</td><td style="padding:4px 0">${formatDate(data.originalDate)}</td></tr>
+              <tr><td style="padding:4px 0;color:#666">Time</td><td style="padding:4px 0">${formatTime(data.originalTime)}</td></tr>
+              <tr><td style="padding:4px 0;color:#666">Course</td><td style="padding:4px 0">${data.originalCourse}</td></tr>
+              <tr><td colspan="2" style="padding:12px 0 4px;color:#666;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Proposed</td></tr>
+              <tr><td style="padding:4px 0;color:#666;width:80px">Date</td><td style="padding:4px 0;font-weight:600">${formatDate(data.proposedDate)}</td></tr>
+              <tr><td style="padding:4px 0;color:#666">Time</td><td style="padding:4px 0;font-weight:600">${formatTime(data.proposedTime)}</td></tr>
+              <tr><td style="padding:4px 0;color:#666">Course</td><td style="padding:4px 0;font-weight:600">${data.proposedCourse}</td></tr>
+            </table>
+            <a href="${teeTimeUrl}" style="display:inline-block;background:#18181b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Respond Now</a>
+            <p style="color:#999;font-size:12px;margin-top:24px">You're receiving this because you're confirmed in for this round on GolfSync.</p>
+          </div>
+        `,
+      })
+    )
+  )
+}
+
 // ── Proposal response alerts to admin ────────────────────────────────────
 
 interface ProposalEmailData {
@@ -200,7 +252,7 @@ export async function sendProposalDeclinedEmail(
   data: ProposalEmailData
 ) {
   if (!isConfigured()) {
-    console.log('[email] RESEND_API_KEY not set — skipping proposal_declined email')
+    logEmail(admin.email, `❌ ${player.name} can't make the proposed change — ${formatDate(data.proposedDate)}`, { player: player.name, ...data })
     return
   }
 
@@ -235,7 +287,7 @@ export async function sendProposalAcceptedEmail(
   data: ProposalEmailData
 ) {
   if (!isConfigured()) {
-    console.log('[email] RESEND_API_KEY not set — skipping proposal_accepted email')
+    logEmail(admin.email, `✅ Everyone agreed — tee time updated to ${formatDate(data.proposedDate)}`, { ...data })
     return
   }
 
@@ -271,7 +323,7 @@ export async function sendRsvpChangeAlert(
   newStatus: 'in' | 'out'
 ) {
   if (!isConfigured()) {
-    console.log('[email] RESEND_API_KEY not set — skipping rsvp_change email')
+    logEmail(admin.email, `${player.name} changed their RSVP to ${newStatus.toUpperCase()} — ${formatDate(data.date)}`, { player: player.name, newStatus, ...data })
     return
   }
 

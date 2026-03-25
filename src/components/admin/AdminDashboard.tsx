@@ -47,6 +47,7 @@ interface GroupInfo {
 interface AdminDashboardProps {
   groupId: string
   memberId: string
+  defaultTab?: string
 }
 
 function SkeletonCard() {
@@ -64,7 +65,7 @@ function SkeletonCard() {
   )
 }
 
-export function AdminDashboard({ groupId, memberId }: AdminDashboardProps) {
+export function AdminDashboard({ groupId, memberId, defaultTab }: AdminDashboardProps) {
   const [teeTimes, setTeeTimes] = useState<TeeTimeWithRsvps[]>([])
   const [pastTeeTimes, setPastTeeTimes] = useState<TeeTimeWithRsvps[]>([])
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null)
@@ -114,7 +115,7 @@ export function AdminDashboard({ groupId, memberId }: AdminDashboardProps) {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="upcoming">
+      <Tabs defaultValue={defaultTab ?? 'upcoming'}>
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="upcoming" className="flex-1 sm:flex-none">Upcoming</TabsTrigger>
           <TabsTrigger value="past" className="flex-1 sm:flex-none">Past Rounds</TabsTrigger>

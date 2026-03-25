@@ -51,5 +51,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: memberError?.message ?? 'Failed to add you to group' }, { status: 500 })
   }
 
+  // Auto-create the Default roster group and add the admin to it
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: defaultGroup } = await (supabase as any)
+    .from('roster_groups')
+    .insert({ group_id: group.id, name: 'Default', is_default: true })
+    .select('id')
+    .single()
+
+  if (defaultGroup) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from('roster_group_members')
+      .insert({ roster_group_id: defaultGroup.id, member_id: member.id })
+  }
+
   return NextResponse.json({ group, member }, { status: 201 })
 }

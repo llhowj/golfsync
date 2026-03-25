@@ -5,11 +5,11 @@ import { AdminDashboard } from '@/components/admin/AdminDashboard'
 import { PlayerDashboard } from '@/components/player/PlayerDashboard'
 
 interface DashboardPageProps {
-  searchParams: Promise<{ g?: string }>
+  searchParams: Promise<{ g?: string; tab?: string }>
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const { g: selectedGroupId } = await searchParams
+  const { g: selectedGroupId, tab } = await searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,6 +22,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const allMembers = members ?? []
   const adminMembers = allMembers.filter((m) => m.is_admin)
+  const adminGroups = adminMembers.map((m) => {
+    const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
+    return { id: m.group_id, name: g?.name ?? 'My Group', homeCourse: g?.home_course ?? '' }
+  })
 
   // ?g=<groupId>: show admin dashboard for that group
   if (selectedGroupId) {
@@ -30,9 +34,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
     return (
       <div className="flex flex-col min-h-full">
-        <Navbar user={user} />
+        <Navbar user={user} adminGroups={adminGroups} />
         <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 sm:px-6">
-          <AdminDashboard groupId={activeMember.group_id} memberId={activeMember.id} />
+          <AdminDashboard groupId={activeMember.group_id} memberId={activeMember.id} defaultTab={tab} />
         </main>
       </div>
     )
@@ -41,7 +45,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   // Default: tee times view for everyone
   return (
     <div className="flex flex-col min-h-full">
-      <Navbar user={user} />
+      <Navbar user={user} adminGroups={adminGroups} />
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 sm:px-6">
         {allMembers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
@@ -53,32 +57,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         ) : (
           <div className="space-y-8">
-            {adminMembers.length > 0 && (
-              <section className="space-y-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Your Groups
-                </h2>
-                <div className="flex flex-col gap-2">
-                  {adminMembers.map((m) => {
-                    const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-                    return (
-                      <a
-                        key={m.group_id}
-                        href={`/dashboard?g=${m.group_id}`}
-                        className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/50 transition-colors"
-                      >
-                        <div>
-                          <p className="font-medium text-sm">{g?.name ?? 'Unnamed Group'}</p>
-                          <p className="text-xs text-muted-foreground">Admin</p>
-                        </div>
-                        <span className="text-muted-foreground text-sm">Manage →</span>
-                      </a>
-                    )
-                  })}
-                </div>
-              </section>
-            )}
-            <PlayerDashboard memberIds={allMembers.map((m) => m.id)} />
+            <PlayerDashboard memberIds={allMembers.map((m) => m.id)} adminGroups={adminGroups} />
           </div>
         )}
       </main>

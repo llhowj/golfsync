@@ -19,13 +19,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface MemberOption {
   id: string
   name: string
-  type: 'core' | 'backup'
 }
 
+interface RosterGroup {
+  id: string
+  name: string
+  is_default: boolean
+  memberIds: string[]
+}
+
+// One invite slot per player in the selected group
 interface Slot {
-  corePlayerId: string
-  coreName: string
-  selectedId: string  // member id or 'none'
+  memberId: string   // who fills this slot
+  defaultMemberId: string  // the original group member for this slot
+  name: string       // display name when slot is at default
 }
 
 interface AddTeeTimeDialogProps {
@@ -55,15 +62,16 @@ export function AddTeeTimeDialog({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [rosterGroups, setRosterGroups] = useState<RosterGroup[]>([])
+  const [allMembers, setAllMembers] = useState<MemberOption[]>([])
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('')
   const [slots, setSlots] = useState<Slot[]>([])
-  const [backups, setBackups] = useState<MemberOption[]>([])
   const [loadingMembers, setLoadingMembers] = useState(false)
 
   // Inline add-to-roster state
   const [addPlayerOpen, setAddPlayerOpen] = useState(false)
   const [newPlayerName, setNewPlayerName] = useState('')
   const [newPlayerEmail, setNewPlayerEmail] = useState('')
-  const [newPlayerType, setNewPlayerType] = useState<'core' | 'backup'>('backup')
   const [addingPlayer, setAddingPlayer] = useState(false)
   const [addPlayerError, setAddPlayerError] = useState<string | null>(null)
 
@@ -78,52 +86,69 @@ export function AddTeeTimeDialog({
     setAddPlayerOpen(false)
     setNewPlayerName('')
     setNewPlayerEmail('')
-    setNewPlayerType('backup')
     setAddPlayerError(null)
     setLoadingMembers(true)
-    authFetch(`/api/members?groupId=${groupId}`)
-      .then(r => r.json())
-      .then(data => {
-        const members: Array<{
-          id: string
-          player_type: 'core' | 'backup'
-          invited_name: string | null
-          profiles: { name: string } | { name: string }[] | null
-        }> = data.members ?? []
 
-        const getName = (m: typeof members[0]) => {
-          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-          return p?.name ?? m.invited_name ?? 'Unknown'
-        }
+    Promise.all([
+      authFetch(`/api/roster-groups?groupId=${groupId}`).then(r => r.json()),
+      authFetch(`/api/members?groupId=${groupId}`).then(r => r.json()),
+    ]).then(([groupsData, membersData]) => {
+      const groups: RosterGroup[] = groupsData.rosterGroups ?? []
+      const members: Array<{
+        id: string
+        invited_name: string | null
+        profiles: { name: string } | { name: string }[] | null
+      }> = membersData.members ?? []
 
-        const coreMembers = members.filter(m => m.player_type === 'core')
-        const backupMembers = members.filter(m => m.player_type === 'backup')
+      const getName = (m: typeof members[0]) => {
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+        return p?.name ?? m.invited_name ?? 'Unknown'
+      }
 
-        setSlots(coreMembers.map(m => ({
-          corePlayerId: m.id,
-          coreName: getName(m),
-          selectedId: m.id,
-        })))
-        setBackups(backupMembers.map(m => ({ id: m.id, name: getName(m), type: 'backup' })))
-      })
-      .finally(() => setLoadingMembers(false))
+      setRosterGroups(groups)
+      setAllMembers(members.map(m => ({ id: m.id, name: getName(m) })).sort((a, b) => a.name.localeCompare(b.name)))
+
+      // Default to the Default group
+      const defaultGroup = groups.find(g => g.is_default) ?? groups[0]
+      if (defaultGroup) {
+        setSelectedGroupId(defaultGroup.id)
+        buildSlots(defaultGroup, members.map(m => ({ id: m.id, name: getName(m) })))
+      } else {
+        setSelectedGroupId('')
+        setSlots([])
+      }
+    }).finally(() => setLoadingMembers(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, groupId])
 
-  function setSlotSelection(corePlayerId: string, selectedId: string) {
-    setSlots(prev => prev.map(s => s.corePlayerId === corePlayerId ? { ...s, selectedId } : s))
+  function buildSlots(group: RosterGroup, memberOptions: MemberOption[]) {
+    const memberMap = new Map(memberOptions.map(m => [m.id, m.name]))
+    setSlots(
+      group.memberIds.map(mid => ({
+        memberId: mid,
+        defaultMemberId: mid,
+        name: memberMap.get(mid) ?? 'Unknown',
+      }))
+    )
   }
 
-  function getSlotOptions(slot: Slot): Array<{ id: string; label: string }> {
-    const usedBackupIds = new Set(
-      slots
-        .filter(s => s.corePlayerId !== slot.corePlayerId && s.selectedId !== s.corePlayerId && s.selectedId !== 'none')
-        .map(s => s.selectedId)
-    )
+  function handleGroupChange(newGroupId: string | null) {
+    if (!newGroupId) return
+    setSelectedGroupId(newGroupId)
+    const group = rosterGroups.find(g => g.id === newGroupId)
+    if (group) buildSlots(group, allMembers)
+    else setSlots([])
+  }
+
+  function setSlotMember(index: number, memberId: string) {
+    setSlots(prev => prev.map((s, i) => i === index ? { ...s, memberId } : s))
+  }
+
+  function getSlotOptions(slotIndex: number): MemberOption[] {
+    const usedIds = new Set(slots.filter((_, i) => i !== slotIndex && slots[i].memberId !== 'none').map(s => s.memberId))
     return [
-      { id: slot.corePlayerId, label: slot.coreName },
-      ...backups.filter(b => !usedBackupIds.has(b.id)).map(b => ({ id: b.id, label: b.name })),
-      { id: 'none', label: 'None' },
+      ...allMembers.filter(m => !usedIds.has(m.id)),
+      { id: 'none', name: 'None' },
     ]
   }
 
@@ -146,26 +171,19 @@ export function AddTeeTimeDialog({
           groupId,
           name: newPlayerName.trim(),
           email: newPlayerEmail.trim().toLowerCase(),
-          playerType: newPlayerType,
+          playerType: 'core',
         }),
       })
       const data = await res.json()
       if (!res.ok) { setAddPlayerError(data.error ?? 'Failed to add player.'); return }
 
-      const newId = data.member?.id
-      const newName = newPlayerName.trim()
+      const newMember: MemberOption = { id: data.member?.id, name: newPlayerName.trim() }
+      setAllMembers(prev => [...prev, newMember])
 
-      if (newPlayerType === 'core') {
-        setSlots(prev => [...prev, { corePlayerId: newId, coreName: newName, selectedId: newId }])
-      } else {
-        setBackups(prev => [...prev, { id: newId, name: newName, type: 'backup' }])
-      }
-
-      toast.success(`${newName} added to roster.`)
+      toast.success(`${newPlayerName.trim()} added to roster.`)
       setAddPlayerOpen(false)
       setNewPlayerName('')
       setNewPlayerEmail('')
-      setNewPlayerType('backup')
     } finally {
       setAddingPlayer(false)
     }
@@ -176,7 +194,7 @@ export function AddTeeTimeDialog({
     setError(null)
     setSubmitting(true)
 
-    const inviteeIds = slots.map(s => s.selectedId).filter(id => id !== 'none')
+    const inviteeIds = slots.map(s => s.memberId).filter(id => id !== 'none')
 
     try {
       const res = await authFetch('/api/tee-times', {
@@ -203,7 +221,7 @@ export function AddTeeTimeDialog({
 
       toast.success('Tee time added! Players have been notified.')
 
-      // Auto-add to admin's Google Calendar
+      // Auto-open Google Calendar
       const [year, month, day] = date.split('-').map(Number)
       const [hour, minute] = time.split(':').map(Number)
       const pad = (n: number) => String(n).padStart(2, '0')
@@ -311,38 +329,54 @@ export function AddTeeTimeDialog({
 
           {/* Invited players */}
           <div className="space-y-2">
-            <Label>Invited Players</Label>
+            <div className="flex items-center justify-between">
+              <Label>Invited Players</Label>
+              {rosterGroups.length > 1 && (
+                <Select value={selectedGroupId} onValueChange={handleGroupChange} disabled={loadingMembers || submitting}>
+                  <SelectTrigger className="h-7 w-40 text-xs">
+                    <SelectValue>
+                      {rosterGroups.find(g => g.id === selectedGroupId)?.name ?? 'Select group…'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rosterGroups.map(g => (
+                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
             {loadingMembers ? (
               <p className="text-sm text-muted-foreground">Loading players...</p>
             ) : slots.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No core players in roster yet.</p>
+              <p className="text-sm text-muted-foreground">No players in the Default group yet. Add players in Roster settings.</p>
             ) : (
-              <div className="space-y-2">
-                {slots.map((slot) => {
-                  const options = getSlotOptions(slot)
-                  const selectedLabel = options.find(o => o.id === slot.selectedId)?.label ?? 'None'
+              <div className="space-y-1.5">
+                {slots.map((slot, index) => {
+                  const options = getSlotOptions(index)
                   return (
-                    <div key={slot.corePlayerId} className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground w-24 shrink-0 truncate">{slot.coreName}</span>
-                      <Select
-                        value={slot.selectedId}
-                        onValueChange={(v) => setSlotSelection(slot.corePlayerId, v ?? slot.corePlayerId)}
-                        disabled={submitting}
-                      >
-                        <SelectTrigger className="flex-1 h-8 text-sm">
-                          <SelectValue>
-                            <span className={slot.selectedId === 'none' ? 'text-muted-foreground' : undefined}>
-                              {selectedLabel}
-                            </span>
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {options.map(o => (
-                            <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <Select
+                      key={index}
+                      value={slot.memberId}
+                      onValueChange={(v) => v && setSlotMember(index, v)}
+                      disabled={submitting}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue>
+                          {slot.memberId === 'none'
+                            ? <span className="text-muted-foreground">None</span>
+                            : (allMembers.find(m => m.id === slot.memberId)?.name ?? 'Unknown')}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {options.map(o => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.name === 'None' ? <span className="text-muted-foreground">None</span> : o.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )
                 })}
               </div>
@@ -380,32 +414,12 @@ export function AddTeeTimeDialog({
                   className="h-8 text-sm"
                   disabled={addingPlayer}
                 />
-                <Select
-                  value={newPlayerType}
-                  onValueChange={(v) => setNewPlayerType(v as 'core' | 'backup')}
-                  disabled={addingPlayer}
-                >
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="core">Core Player</SelectItem>
-                    <SelectItem value="backup">Backup Player</SelectItem>
-                  </SelectContent>
-                </Select>
                 <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleAddPlayer}
-                    disabled={addingPlayer}
-                  >
+                  <Button type="button" size="sm" onClick={handleAddPlayer} disabled={addingPlayer}>
                     {addingPlayer ? 'Adding...' : 'Add to Roster'}
                   </Button>
                   <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
+                    type="button" size="sm" variant="ghost"
                     onClick={() => { setAddPlayerOpen(false); setAddPlayerError(null) }}
                     disabled={addingPlayer}
                   >

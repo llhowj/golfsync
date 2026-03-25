@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button'
 
 interface NavbarProps {
   user: User
+  adminGroups?: { id: string; name: string }[]
 }
 
 function getInitials(user: User): string {
@@ -50,7 +51,7 @@ function getDisplayName(user: User): string {
   )
 }
 
-export function Navbar({ user }: NavbarProps) {
+export function Navbar({ user, adminGroups = [] }: NavbarProps) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -153,6 +154,20 @@ export function Navbar({ user }: NavbarProps) {
               <DropdownMenuItem onClick={() => setCreateGroupOpen(true)}>
                 Add a group
               </DropdownMenuItem>
+
+              {adminGroups.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  {adminGroups.map((g) => (
+                    <DropdownMenuItem
+                      key={g.id}
+                      onClick={() => router.push(`/roster?g=${g.id}`)}
+                    >
+                      Roster{adminGroups.length > 1 ? ` — ${g.name}` : ''}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
 
               <DropdownMenuSeparator />
 

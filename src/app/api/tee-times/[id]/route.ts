@@ -3,6 +3,53 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getUserFromRequest } from '@/lib/get-user'
 import { sendTeeTimeCancelledEmails } from '@/lib/email'
 
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params
+
+  const user = await getUserFromRequest(request)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = createAdminClient()
+
+  const { data: teeTime } = await supabase
+    .from('tee_times')
+    .select(`
+      id, date, start_time, course, max_slots, notes, deleted_at, group_id,
+      rsvps (
+        id, status, note,
+        member:group_members ( id, invited_name, profiles ( name ) )
+      )
+    `)
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!teeTime) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Verify user is a member of this group
+  const { data: member } = await supabase
+    .from('group_members')
+    .select('id, is_admin')
+    .eq('group_id', teeTime.group_id)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // Fetch pending proposal
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: pendingProposal } = await (supabase as any)
+    .from('tee_time_proposals')
+    .select('id, proposed_date, proposed_start_time, proposed_course, proposal_responses(member_id, response)')
+    .eq('tee_time_id', id)
+    .eq('status', 'pending')
+    .maybeSingle()
+
+  return NextResponse.json({ ...teeTime, pendingProposal: pendingProposal ?? null })
+}
+
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }

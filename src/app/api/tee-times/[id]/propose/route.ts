@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserFromRequest } from '@/lib/get-user'
+import { sendProposalNotificationEmails } from '@/lib/email'
 
 export async function POST(
   request: NextRequest,
@@ -105,6 +106,46 @@ export async function POST(
       proposal_id: proposal.id,
       member_id: memberId,
     })))
+
+  // Fetch original tee time details + group name + player emails for notifications
+  const { data: originalTeeTime } = await supabase
+    .from('tee_times')
+    .select('date, start_time, course, group:groups(name)')
+    .eq('id', teeTimeId)
+    .single()
+
+  const { data: playerMembers } = await supabase
+    .from('group_members')
+    .select('invited_name, invited_email, profiles(name, email)')
+    .in('id', nonAdminInviteeIds)
+
+  if (originalTeeTime && playerMembers) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const groupName = (Array.isArray((originalTeeTime as any).group) ? (originalTeeTime as any).group[0] : (originalTeeTime as any).group)?.name ?? 'Your Golf Group'
+
+    const recipients = playerMembers
+      .map(m => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const profile = Array.isArray((m as any).profiles) ? (m as any).profiles[0] : (m as any).profiles
+        const email = profile?.email ?? m.invited_email
+        const name = profile?.name ?? m.invited_name ?? 'Player'
+        return email ? { name, email } : null
+      })
+      .filter(Boolean) as { name: string; email: string }[]
+
+    if (recipients.length > 0) {
+      await sendProposalNotificationEmails(recipients, {
+        teeTimeId,
+        originalDate: originalTeeTime.date,
+        originalTime: originalTeeTime.start_time,
+        originalCourse: originalTeeTime.course,
+        proposedDate: date,
+        proposedTime: time,
+        proposedCourse: course,
+        groupName,
+      })
+    }
+  }
 
   return NextResponse.json({ applied: false, proposalId: proposal.id })
 }

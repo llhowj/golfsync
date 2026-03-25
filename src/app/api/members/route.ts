@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { groupId, name, email, phone, playerType } = body
+  const { groupId, name, email, phone, playerType, addToDefault } = body
 
   if (!groupId || !name || !email || !playerType) {
     return NextResponse.json({ error: 'groupId, name, email, and playerType are required' }, { status: 400 })
@@ -100,6 +100,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This player is already in the group' }, { status: 409 })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Optionally add to the Default roster group
+  if (addToDefault && member) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: defaultGroup } = await (adminSupabase as any)
+      .from('roster_groups')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('is_default', true)
+      .maybeSingle()
+
+    if (defaultGroup) {
+      // Check current count
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count } = await (adminSupabase as any)
+        .from('roster_group_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('roster_group_id', defaultGroup.id)
+
+      if ((count ?? 0) < 4) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (adminSupabase as any)
+          .from('roster_group_members')
+          .insert({ roster_group_id: defaultGroup.id, member_id: member.id })
+      }
+    }
   }
 
   // Send invite email to the new player (only if they don't already have an account)

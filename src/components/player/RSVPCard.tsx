@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 
 interface TeeTimeInfo {
   id: string
@@ -44,6 +43,7 @@ interface RSVPCardProps {
   isPast?: boolean
   pendingProposal?: PendingProposal | null
   onProposalResponse?: (proposalId: string, response: 'yes' | 'no') => Promise<void>
+  onManage?: () => void
 }
 
 function formatDate(dateStr: string): string {
@@ -75,6 +75,7 @@ export function RSVPCard({
   isPast = false,
   pendingProposal,
   onProposalResponse,
+  onManage,
 }: RSVPCardProps) {
   const [note, setNote] = useState(myRsvp.note ?? '')
   const [showNote, setShowNote] = useState(false)
@@ -110,24 +111,6 @@ export function RSVPCard({
     }
   }
 
-  const statusLabel =
-    myRsvp.status === 'in'
-      ? 'You are IN'
-      : myRsvp.status === 'out'
-      ? 'You are OUT'
-      : myRsvp.status === 'requested_in'
-      ? 'Request pending'
-      : 'Awaiting your RSVP'
-
-  const statusColor =
-    myRsvp.status === 'in'
-      ? 'text-green-600'
-      : myRsvp.status === 'out'
-      ? 'text-red-500'
-      : myRsvp.status === 'requested_in'
-      ? 'text-amber-600'
-      : 'text-muted-foreground'
-
   const othersGoing = confirmedPlayers
 
   const totalIn = confirmedPlayers.length + (myRsvp.status === 'in' ? 1 : 0)
@@ -149,273 +132,204 @@ export function RSVPCard({
     return `https://www.google.com/calendar/render?${params.toString()}`
   }
 
+  const hasButtons = !isPast || (createdByMe && !!onManage)
+
   return (
     <Card className={isPast ? 'opacity-70' : undefined}>
-      <CardContent className="p-4 space-y-4">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div>
+      <CardContent className="p-3 space-y-2">
+
+        {/* 3-column main row */}
+        <div className="flex gap-3">
+
+          {/* Col 1: date / time / notes */}
+          <div className="flex-1 min-w-0 space-y-1">
             <div className="flex items-center gap-1.5">
-              <p className="font-semibold">{formatDate(teeTime.date)}</p>
+              <p className="font-semibold text-sm">{formatDate(teeTime.date)}</p>
               {createdByMe && (
-                <span title="You set up this tee time" className="inline-flex items-center rounded-full bg-blue-100 p-1 text-blue-700">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                <span title="You set up this tee time" className="inline-flex items-center rounded-full bg-blue-100 p-0.5 text-blue-700 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3">
                     <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.589 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 0 1-.332 0C5.26 16.563 2 12.162 2 7a11.8 11.8 0 0 1 .104-1.589.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.749Z" clipRule="evenodd" />
                   </svg>
                 </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {formatTime(teeTime.start_time)} &bull; {teeTime.course}
-            </p>
-            {invitedBy && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Invited by: {invitedBy}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="text-xs text-muted-foreground">
+                {formatTime(teeTime.start_time)} &bull; {teeTime.course}
               </p>
-            )}
-          </div>
-          <Badge
-            variant="outline"
-            className={`shrink-0 text-xs font-medium ${
-              myRsvp.status === 'in'
-                ? 'border-green-400 text-green-600 bg-green-50'
-                : myRsvp.status === 'out'
-                ? 'border-red-400 text-red-500 bg-red-50'
-                : myRsvp.status === 'requested_in'
-                ? 'border-amber-400 text-amber-600 bg-amber-50'
-                : 'border-border text-muted-foreground'
-            }`}
-          >
-            {myRsvp.status === 'in'
-              ? '✓ In'
-              : myRsvp.status === 'out'
-              ? '✕ Out'
-              : myRsvp.status === 'requested_in'
-              ? '⏳ Requested'
-              : 'Pending'}
-          </Badge>
-        </div>
-
-        {/* Admin note */}
-        {teeTime.notes && (
-          <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground flex items-baseline justify-between gap-4">
-            <span>{teeTime.notes}</span>
+              {myRsvp.status === 'in' && !isPast && (
+                <a href={buildGoogleCalendarUrl()} target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground underline-offset-4 hover:underline hover:text-foreground">
+                  +&nbsp;Cal
+                </a>
+              )}
+            </div>
             {invitedBy && (
-              <span className="text-xs shrink-0">— {invitedBy.split(' ')[0]}</span>
+              <p className="text-xs text-muted-foreground">Invited by {invitedBy}</p>
             )}
-          </div>
-        )}
-
-        {/* Who else is going / pending */}
-        {(othersGoing.length > 0 || pendingPlayers.length > 0) && (
-          <div className="text-sm space-y-1">
-            {othersGoing.length > 0 && (
-              <>
-                <div className="text-muted-foreground">
-                  <span className="font-medium text-foreground">Also playing: </span>
-                  {othersGoing.map((p) => p.name).join(', ')}
-                </div>
-                {othersGoing.filter((p) => p.note).map((p) => (
-                  <p key={p.name} className="text-xs text-muted-foreground italic pl-1">
-                    {p.name}: &ldquo;{p.note}&rdquo;
-                  </p>
-                ))}
-              </>
-            )}
-            {pendingPlayers.length > 0 && (
-              <div className="text-muted-foreground">
-                <span className="font-medium text-foreground">Pending: </span>
-                {pendingPlayers.join(', ')}
+            {teeTime.notes && (
+              <div className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {teeTime.notes}
               </div>
             )}
+            {myRsvp.note && !showNote && (
+              <p className="text-xs text-muted-foreground italic">Your note: &ldquo;{myRsvp.note}&rdquo;</p>
+            )}
+            {!isPast && (
+              <button type="button"
+                className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                onClick={() => setShowNote(v => !v)}>
+                {showNote ? 'Hide note' : myRsvp.note ? 'Edit note' : 'Add a note'}
+              </button>
+            )}
           </div>
-        )}
 
-        {/* Current status */}
-        <div className="flex items-center gap-3">
-          <p className={`text-sm font-medium ${statusColor}`}>{statusLabel}</p>
-          {myRsvp.status === 'in' && !isPast && (
-            <a
-              href={buildGoogleCalendarUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-muted-foreground underline-offset-4 hover:underline hover:text-foreground"
-            >
-              + Add to Google Calendar
-            </a>
+          {/* Col 2: who's in / pending */}
+          {(myRsvp.status === 'in' || othersGoing.length > 0 || pendingPlayers.length > 0) && (
+            <div className="w-[110px] shrink-0 space-y-0.5">
+              {(myRsvp.status === 'in' || othersGoing.length > 0) && (
+                <>
+                  <p className="text-xs font-medium text-foreground">In</p>
+                  {myRsvp.status === 'in' && (
+                    <p className="text-xs text-muted-foreground truncate">You</p>
+                  )}
+                  {othersGoing.map(p => (
+                    <p key={p.name} className="text-xs text-muted-foreground truncate">{p.name}</p>
+                  ))}
+                  {othersGoing.filter(p => p.note).map(p => (
+                    <p key={p.name + '-note'} className="text-xs text-muted-foreground italic pl-1 truncate">&ldquo;{p.note}&rdquo;</p>
+                  ))}
+                </>
+              )}
+              {pendingPlayers.length > 0 && (
+                <>
+                  <p className="text-xs font-medium text-foreground mt-1">Pending</p>
+                  {pendingPlayers.map(name => (
+                    <p key={name} className="text-xs text-muted-foreground truncate">{name}</p>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Col 3: vertical button stack */}
+          {hasButtons && (
+            <div className="flex flex-col gap-1.5 shrink-0 w-[88px]">
+              {!isPast && (
+                <>
+                  <Button
+                    size="sm"
+                    variant={myRsvp.status === 'in' ? 'default' : 'outline'}
+                    className={`w-full text-xs font-semibold px-2 ${
+                      myRsvp.status === 'in'
+                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-600'
+                        : myRsvp.status === 'requested_in'
+                        ? 'border-amber-400 text-amber-600 bg-amber-50 cursor-not-allowed'
+                        : 'border-green-400 text-green-700 hover:bg-green-50 hover:border-green-500'
+                    }`}
+                    onClick={() => handleRsvp('in')}
+                    disabled={submitting || myRsvp.status === 'requested_in' || (isFull && myRsvp.status !== 'in')}
+                  >
+                    {submitting && pendingStatus === 'in'
+                      ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      : myRsvp.status === 'requested_in' ? '⏳ Pending' : '✓ I\'m In'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={myRsvp.status === 'out' ? 'default' : 'outline'}
+                    className={`w-full text-xs font-semibold px-2 ${
+                      myRsvp.status === 'out'
+                        ? 'bg-red-500 hover:bg-red-600 text-white border-red-500'
+                        : 'border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400'
+                    }`}
+                    onClick={() => handleRsvp('out')}
+                    disabled={submitting}
+                  >
+                    {submitting && pendingStatus === 'out'
+                      ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      : '✕ I\'m Out'}
+                  </Button>
+                </>
+              )}
+              {createdByMe && onManage && (
+                <button type="button" onClick={onManage}
+                  className="w-full text-xs text-muted-foreground border border-border rounded-md py-1.5 hover:bg-muted hover:text-foreground transition-colors text-center">
+                  Manage →
+                </button>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Calendar reminder */}
-        {showCalendarReminder && (
-          <div className="flex items-start justify-between gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
-            <span>
-              Did you add this to Google Calendar?{' '}
-              <a
-                href="https://calendar.google.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2 font-medium"
-              >
-                Open Google Calendar
-              </a>{' '}
-              to remove it.
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowCalendarReminder(false)}
-              className="shrink-0 text-amber-600 hover:text-amber-900 font-bold leading-none"
-              aria-label="Dismiss"
-            >
-              ×
-            </button>
-          </div>
-        )}
+        {/* Full-width extras below the main row */}
 
-        {/* Note from previous RSVP */}
-        {myRsvp.note && !showNote && (
-          <p className="text-xs text-muted-foreground italic">
-            Your note: &ldquo;{myRsvp.note}&rdquo;
+        {isFull && !isPast && myRsvp.status !== 'in' && myRsvp.status !== 'requested_in' && (
+          <p className="text-xs text-amber-600 font-medium">
+            This tee time is full — all {teeTime.max_slots} slots are taken.
+          </p>
+        )}
+        {myRsvp.status === 'requested_in' && !isPast && (
+          <p className="text-xs text-amber-700 font-medium bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
+            Your request to rejoin is pending approval. Click &ldquo;I&apos;m Out&rdquo; to cancel it.
           </p>
         )}
 
-        {/* Proposed change */}
+        {showNote && !isPast && (
+          <div className="space-y-1.5">
+            <Textarea
+              placeholder="e.g. I might be 5 min late…"
+              value={note}
+              onChange={e => { if (e.target.value.length <= 140) setNote(e.target.value) }}
+              rows={2}
+              className="resize-none text-sm"
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">{note.length}/140</p>
+              <Button type="button" size="sm" variant="outline" onClick={handleSaveNote} disabled={submitting}>
+                {submitting && pendingStatus === null ? 'Saving...' : 'Save Note'}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {pendingProposal && !isPast && (
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 space-y-2">
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 space-y-1.5">
             <p className="text-xs font-semibold text-blue-700">Proposed Change</p>
-            <p className="text-sm text-blue-900">
+            <p className="text-xs text-blue-900">
               {formatDate(pendingProposal.proposed_date)} &bull; {formatTime(pendingProposal.proposed_start_time)} &bull; {pendingProposal.proposed_course}
             </p>
             {pendingProposal.myResponse === null && onProposalResponse ? (
-              <div className="flex gap-2 pt-0.5">
-                <button
-                  type="button"
-                  disabled={proposalSubmitting}
-                  onClick={async () => {
-                    setProposalSubmitting(true)
-                    try { await onProposalResponse(pendingProposal.id, 'yes') } finally { setProposalSubmitting(false) }
-                  }}
-                  className="text-xs font-medium px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                >
+              <div className="flex gap-2">
+                <button type="button" disabled={proposalSubmitting}
+                  onClick={async () => { setProposalSubmitting(true); try { await onProposalResponse(pendingProposal.id, 'yes') } finally { setProposalSubmitting(false) } }}
+                  className="text-xs font-medium px-3 py-1 rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
                   Works for me
                 </button>
-                <button
-                  type="button"
-                  disabled={proposalSubmitting}
-                  onClick={async () => {
-                    setProposalSubmitting(true)
-                    try { await onProposalResponse(pendingProposal.id, 'no') } finally { setProposalSubmitting(false) }
-                  }}
-                  className="text-xs font-medium px-3 py-1.5 rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                >
+                <button type="button" disabled={proposalSubmitting}
+                  onClick={async () => { setProposalSubmitting(true); try { await onProposalResponse(pendingProposal.id, 'no') } finally { setProposalSubmitting(false) } }}
+                  className="text-xs font-medium px-3 py-1 rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
                   Can&apos;t make it
                 </button>
               </div>
             ) : (
               <p className="text-xs text-blue-600">
-                {pendingProposal.myResponse === 'yes' ? '✓ You agreed to this change — waiting on others.' : '✕ You declined this change.'}
+                {pendingProposal.myResponse === 'yes' ? '✓ You agreed — waiting on others.' : '✕ You declined this change.'}
               </p>
             )}
           </div>
         )}
 
-        {/* RSVP buttons */}
-        {!isPast && (
-          <div className="space-y-3">
-            {myRsvp.status === 'requested_in' && (
-              <p className="text-xs text-center text-amber-700 font-medium bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                Your request to rejoin is pending admin approval. Click &ldquo;I&apos;m Out&rdquo; to cancel it.
-              </p>
-            )}
-            {isFull && myRsvp.status !== 'in' && myRsvp.status !== 'requested_in' && (
-              <p className="text-xs text-center text-amber-600 font-medium">
-                This tee time is full — all {teeTime.max_slots} slots are taken.
-              </p>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                size="lg"
-                variant={myRsvp.status === 'in' ? 'default' : 'outline'}
-                className={`w-full text-base font-semibold h-14 ${
-                  myRsvp.status === 'in'
-                    ? 'bg-green-600 hover:bg-green-700 text-white border-green-600'
-                    : myRsvp.status === 'requested_in'
-                    ? 'border-amber-400 text-amber-600 bg-amber-50 cursor-not-allowed'
-                    : 'border-green-400 text-green-700 hover:bg-green-50 hover:border-green-500'
-                }`}
-                onClick={() => handleRsvp('in')}
-                disabled={submitting || myRsvp.status === 'requested_in' || (isFull && myRsvp.status !== 'in')}
-              >
-                {submitting && pendingStatus === 'in' ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Saving...
-                  </span>
-                ) : myRsvp.status === 'requested_in' ? (
-                  <>⏳ Requested</>
-                ) : (
-                  <>✓ I&apos;m In</>
-                )}
-              </Button>
-
-              <Button
-                size="lg"
-                variant={myRsvp.status === 'out' ? 'default' : 'outline'}
-                className={`w-full text-base font-semibold h-14 ${
-                  myRsvp.status === 'out'
-                    ? 'bg-red-500 hover:bg-red-600 text-white border-red-500'
-                    : 'border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400'
-                }`}
-                onClick={() => handleRsvp('out')}
-                disabled={submitting}
-              >
-                {submitting && pendingStatus === 'out' ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Saving...
-                  </span>
-                ) : (
-                  <>✕ I&apos;m Out</>
-                )}
-              </Button>
-            </div>
-
-            {/* Add/edit note toggle */}
-            <button
-              type="button"
-              className="text-xs text-muted-foreground underline-offset-4 hover:underline w-full text-center"
-              onClick={() => setShowNote((v) => !v)}
-            >
-              {showNote ? 'Hide note' : myRsvp.note ? 'Edit your note' : 'Add a note (optional)'}
-            </button>
-
-            {showNote && (
-              <div className="space-y-2">
-                <Textarea
-                  placeholder="e.g. I might be 5 min late…"
-                  value={note}
-                  onChange={(e) => {
-                    if (e.target.value.length <= 140) setNote(e.target.value)
-                  }}
-                  rows={2}
-                  className="resize-none text-sm"
-                />
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">{note.length}/140</p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={handleSaveNote}
-                    disabled={submitting}
-                  >
-                    {submitting && pendingStatus === null ? 'Saving...' : 'Save Note'}
-                  </Button>
-                </div>
-              </div>
-            )}
+        {showCalendarReminder && (
+          <div className="flex items-start justify-between gap-2 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-xs text-amber-800">
+            <span>
+              Did you add this to Google Calendar?{' '}
+              <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 font-medium">Open Google Calendar</a>{' '}
+              to remove it.
+            </span>
+            <button type="button" onClick={() => setShowCalendarReminder(false)} className="shrink-0 text-amber-600 hover:text-amber-900 font-bold leading-none" aria-label="Dismiss">×</button>
           </div>
         )}
+
       </CardContent>
     </Card>
   )

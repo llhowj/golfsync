@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { authFetch } from '@/lib/auth-fetch'
 
@@ -19,63 +19,86 @@ interface MemberProfile {
 
 interface Member {
   id: string
-  player_type: 'core' | 'backup'
-  backup_rank: number | null
   is_admin: boolean
   invited_name: string | null
   invited_email: string | null
   profiles: MemberProfile | null
 }
 
+interface RosterGroup {
+  id: string
+  name: string
+  is_default: boolean
+  memberIds: string[]
+}
+
 interface ManageRosterTabProps {
   groupId: string
 }
 
-const EMPTY_FORM = { name: '', email: '', phone: '', playerType: 'core', isAdmin: false }
+const EMPTY_ADD_FORM = { name: '', email: '', phone: '', isAdmin: false, addToDefault: false }
 
 export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
   const [members, setMembers] = useState<Member[]>([])
+  const [rosterGroups, setRosterGroups] = useState<RosterGroup[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Add dialog
+  // Add player dialog
   const [addOpen, setAddOpen] = useState(false)
-  const [addForm, setAddForm] = useState(EMPTY_FORM)
+  const [addForm, setAddForm] = useState(EMPTY_ADD_FORM)
   const [addError, setAddError] = useState<string | null>(null)
   const [addSaving, setAddSaving] = useState(false)
 
-  // Edit dialog
+  // Edit player dialog
   const [editMember, setEditMember] = useState<Member | null>(null)
-  const [editForm, setEditForm] = useState(EMPTY_FORM)
+  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', isAdmin: false })
   const [editError, setEditError] = useState<string | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const fetchMembers = useCallback(async () => {
+  // Tab state (controlled so it doesn't reset on re-render)
+  const [tab, setTab] = useState<'players' | 'groups'>('players')
+
+  // Roster group state
+  const [newGroupName, setNewGroupName] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [showNewGroupInput, setShowNewGroupInput] = useState(false)
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null)
+
+  // Add-members-to-group dialog
+  const [addMembersGroupId, setAddMembersGroupId] = useState<string | null>(null)
+  const [addMembersSelected, setAddMembersSelected] = useState<Set<string>>(new Set())
+
+
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await authFetch(`/api/members?groupId=${groupId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setMembers(data.members ?? [])
-      }
+      const [membersRes, groupsRes] = await Promise.all([
+        authFetch(`/api/members?groupId=${groupId}`),
+        authFetch(`/api/roster-groups?groupId=${groupId}`),
+      ])
+      const membersData = membersRes.ok ? await membersRes.json() : { members: [] }
+      const groupsData = groupsRes.ok ? await groupsRes.json() : { rosterGroups: [] }
+      setMembers(membersData.members ?? [])
+      setRosterGroups(groupsData.rosterGroups ?? [])
     } finally {
       setLoading(false)
     }
   }, [groupId])
 
-  useEffect(() => { fetchMembers() }, [fetchMembers])
-
-  const corePlayers = members.filter(m => m.player_type === 'core')
-  const backupPlayers = members
-    .filter(m => m.player_type === 'backup')
-    .sort((a, b) => (a.backup_rank ?? 99) - (b.backup_rank ?? 99))
+  useEffect(() => { fetchData() }, [fetchData])
 
   function displayName(m: Member) { return m.profiles?.name ?? m.invited_name ?? 'Unknown' }
   function displayEmail(m: Member) { return m.profiles?.email ?? m.invited_email ?? '' }
   function isActive(m: Member) { return !!m.profiles }
 
   // ── Add player ────────────────────────────────────────────────────────────
+
+  const defaultGroup = rosterGroups.find(g => g.is_default)
+  const defaultGroupFull = (defaultGroup?.memberIds.length ?? 0) >= 4
 
   async function handleAdd() {
     setAddError(null)
@@ -85,10 +108,6 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addForm.email)) {
       setAddError('Please enter a valid email address.')
-      return
-    }
-    if (addForm.playerType === 'core' && corePlayers.length >= 4) {
-      setAddError('You already have 4 core players. Add as a backup instead.')
       return
     }
     setAddSaving(true)
@@ -101,15 +120,16 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
           name: addForm.name.trim(),
           email: addForm.email.trim().toLowerCase(),
           phone: addForm.phone.trim() || null,
-          playerType: addForm.playerType,
+          playerType: 'core',
+          addToDefault: addForm.addToDefault,
         }),
       })
       const data = await res.json()
       if (!res.ok) { setAddError(data.error ?? 'Something went wrong.'); return }
       toast.success(`${addForm.name} added to the roster.`)
-      setAddForm(EMPTY_FORM)
+      setAddForm(EMPTY_ADD_FORM)
       setAddOpen(false)
-      fetchMembers()
+      fetchData()
     } finally {
       setAddSaving(false)
     }
@@ -125,7 +145,6 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
       name: displayName(m),
       email: displayEmail(m),
       phone: m.profiles?.phone ?? '',
-      playerType: m.player_type,
       isAdmin: m.is_admin,
     })
   }
@@ -144,7 +163,7 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
       toast.success(`${displayName(editMember)} removed from the roster.`)
       setEditMember(null)
       setConfirmDelete(false)
-      fetchMembers()
+      fetchData()
     } finally {
       setDeleting(false)
     }
@@ -154,7 +173,6 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
     if (!editMember) return
     setEditError(null)
     if (!editForm.name.trim()) { setEditError('Name is required.'); return }
-
     setEditSaving(true)
     try {
       const res = await authFetch('/api/members', {
@@ -166,7 +184,7 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
           name: editForm.name.trim(),
           email: editForm.email.trim().toLowerCase(),
           phone: editForm.phone.trim() || null,
-          playerType: editForm.playerType,
+          playerType: 'core',
           isAdmin: editForm.isAdmin,
         }),
       })
@@ -174,34 +192,100 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
       if (!res.ok) { setEditError(data.error ?? 'Something went wrong.'); return }
       toast.success('Player updated.')
       setEditMember(null)
-      fetchMembers()
+      fetchData()
     } finally {
       setEditSaving(false)
     }
   }
 
-  // ── Reorder backup pool ───────────────────────────────────────────────────
+  // ── Roster groups ─────────────────────────────────────────────────────────
 
-  async function moveBackup(memberId: string, direction: 'up' | 'down') {
-    const sorted = [...backupPlayers]
-    const index = sorted.findIndex(m => m.id === memberId)
-    if (direction === 'up' && index === 0) return
-    if (direction === 'down' && index === sorted.length - 1) return
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    ;[sorted[index], sorted[swapIndex]] = [sorted[swapIndex], sorted[index]]
-    await authFetch('/api/members', {
-      method: 'PATCH',
+  async function handleCreateGroup() {
+    if (!newGroupName.trim()) return
+    setCreatingGroup(true)
+    try {
+      const res = await authFetch('/api/roster-groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId, name: newGroupName.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed to create group.'); return }
+      const newId: string = data.rosterGroup?.id
+      setNewGroupName('')
+      setShowNewGroupInput(false)
+      await fetchData()
+      // Stay on groups tab and open add-members dialog for the new group
+      setTab('groups')
+      if (newId) {
+        setAddMembersSelected(new Set())
+        setAddMembersGroupId(newId)
+      }
+    } finally {
+      setCreatingGroup(false)
+    }
+  }
+
+  async function handleRenameGroup(id: string) {
+    if (!renameValue.trim()) return
+    const res = await authFetch(`/api/roster-groups/${id}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ groupId, orderedMemberIds: sorted.map(m => m.id) }),
+      body: JSON.stringify({ name: renameValue.trim() }),
     })
-    fetchMembers()
+    const data = await res.json()
+    if (!res.ok) { toast.error(data.error ?? 'Failed to rename.'); return }
+    setRenamingGroupId(null)
+    fetchData()
+  }
+
+  async function handleDeleteGroup(id: string) {
+    setDeletingGroupId(id)
+    try {
+      const res = await authFetch(`/api/roster-groups/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed to delete group.'); return }
+      fetchData()
+    } finally {
+      setDeletingGroupId(null)
+    }
+  }
+
+  async function handleAddMembersToGroup() {
+    if (!addMembersGroupId || addMembersSelected.size === 0) {
+      setAddMembersGroupId(null)
+      return
+    }
+    await Promise.all(
+      [...addMembersSelected].map(memberId =>
+        authFetch(`/api/roster-groups/${addMembersGroupId}/members`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memberId }),
+        })
+      )
+    )
+    setAddMembersGroupId(null)
+    setAddMembersSelected(new Set())
+    fetchData()
+  }
+
+  async function handleRemoveFromGroup(rosterGroupId: string, memberId: string) {
+    const res = await authFetch(`/api/roster-groups/${rosterGroupId}/members`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId }),
+    })
+    const data = await res.json()
+    if (!res.ok) { toast.error(data.error ?? 'Failed to remove player.'); return }
+    fetchData()
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="space-y-3 pt-4">
+      <div className="space-y-3">
         {[1, 2, 3, 4].map(i => (
           <div key={i} className="h-16 rounded-xl border border-border bg-muted animate-pulse" />
         ))}
@@ -210,95 +294,268 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
   }
 
   return (
-    <div className="space-y-6 pt-4">
-      <div className="flex items-center justify-end">
-        <Button size="sm" onClick={() => { setAddError(null); setAddForm(EMPTY_FORM); setAddOpen(true) }}>
-          + Add Player
-        </Button>
-      </div>
+    <div>
+      <Tabs value={tab} onValueChange={v => setTab(v as 'players' | 'groups')}>
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="players" className="flex-1 sm:flex-none">All Players</TabsTrigger>
+          <TabsTrigger value="groups" className="flex-1 sm:flex-none">Groups</TabsTrigger>
+        </TabsList>
 
-      {/* Core Players */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Core Players</h3>
-            <CorePlayersInfo />
-          </div>
-          {(() => {
-            const count = corePlayers.length
-            const full = count >= 4
-            return (
-              <span className={`text-xs font-medium ${full ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                {count}/4{full ? ' — full' : ''}
-              </span>
-            )
-          })()}
-        </div>
-        {corePlayers.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">No core players yet.</p>
-        ) : corePlayers.map(m => (
-          <div key={m.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="font-medium truncate">{displayName(m)}</p>
-                {m.is_admin && <Badge variant="secondary" className="text-xs shrink-0">Admin</Badge>}
-              </div>
-              <p className="text-sm text-muted-foreground truncate">{displayEmail(m)}</p>
-            </div>
-            <Badge variant={isActive(m) ? 'default' : 'outline'} className="shrink-0 text-xs">
-              {isActive(m) ? 'Active' : 'Invited'}
-            </Badge>
-            <Button size="sm" variant="outline" className="shrink-0" onClick={() => openEdit(m)}>
-              Edit
+        {/* ── All Players tab ── */}
+        <TabsContent value="players" className="mt-4 space-y-3">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => { setAddError(null); setAddForm(EMPTY_ADD_FORM); setAddOpen(true) }}>
+              + Add Player
             </Button>
           </div>
-        ))}
-      </div>
-
-      {/* Backup Pool */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Backup Pool</h3>
-        <p className="text-xs text-muted-foreground">
-          Backups are contacted in order when a core slot opens. Use ↑↓ to reorder.
-        </p>
-        {backupPlayers.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">No backups yet.</p>
-        ) : backupPlayers.map((m, index) => (
-          <div key={m.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
-            <span className="text-sm font-mono text-muted-foreground w-5 shrink-0 text-center">{index + 1}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="font-medium truncate">{displayName(m)}</p>
-                {m.is_admin && <Badge variant="secondary" className="text-xs shrink-0">Admin</Badge>}
+          {members.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">No players yet.</p>
+          ) : members.map(m => (
+            <div key={m.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium truncate">{displayName(m)}</p>
+                  {m.is_admin && <Badge variant="secondary" className="text-xs shrink-0">Admin</Badge>}
+                </div>
+                <p className="text-sm text-muted-foreground truncate">{displayEmail(m)}</p>
               </div>
-              <p className="text-sm text-muted-foreground truncate">{displayEmail(m)}</p>
+              <Badge variant={isActive(m) ? 'default' : 'outline'} className="shrink-0 text-xs">
+                {isActive(m) ? 'Active' : 'Invited'}
+              </Badge>
+              <Button size="sm" variant="outline" className="shrink-0" onClick={() => openEdit(m)}>
+                Edit
+              </Button>
             </div>
-            <Badge variant={isActive(m) ? 'default' : 'outline'} className="shrink-0 text-xs">
-              {isActive(m) ? 'Active' : 'Invited'}
-            </Badge>
-            <Button size="sm" variant="outline" className="shrink-0" onClick={() => openEdit(m)}>
-              Edit
-            </Button>
-            <div className="flex flex-col gap-0.5 shrink-0">
-              <button onClick={() => moveBackup(m.id, 'up')} disabled={index === 0}
-                className="text-muted-foreground hover:text-foreground disabled:opacity-25 leading-none px-1" aria-label="Move up">↑</button>
-              <button onClick={() => moveBackup(m.id, 'down')} disabled={index === backupPlayers.length - 1}
-                className="text-muted-foreground hover:text-foreground disabled:opacity-25 leading-none px-1" aria-label="Move down">↓</button>
+          ))}
+        </TabsContent>
+
+        {/* ── Groups tab ── */}
+        <TabsContent value="groups" className="mt-4 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Groups let you quickly invite a set of players when creating a tee time.
+          </p>
+
+        {rosterGroups.map(group => {
+          const groupMembers = members.filter(m => group.memberIds.includes(m.id))
+          const nonMembers = members.filter(m => !group.memberIds.includes(m.id))
+          const isFull = group.memberIds.length >= 4
+
+          return (
+            <div key={group.id} className="rounded-xl border border-border bg-card p-4 space-y-3">
+              {/* Group header */}
+              <div className="flex items-center gap-2">
+                {renamingGroupId === group.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <Input
+                      value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      className="h-7 text-sm flex-1"
+                      onKeyDown={e => { if (e.key === 'Enter') handleRenameGroup(group.id); if (e.key === 'Escape') setRenamingGroupId(null) }}
+                      autoFocus
+                    />
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => handleRenameGroup(group.id)}>Save</Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setRenamingGroupId(null)}>Cancel</Button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="font-medium text-sm flex-1">
+                      {group.name}
+                      {group.is_default && <span className="ml-2 text-xs text-muted-foreground font-normal">(Default)</span>}
+                    </span>
+                    <span className={`text-xs font-medium ${isFull ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                      {group.memberIds.length}/4{isFull ? ' — full' : ''}
+                    </span>
+                    {!group.is_default && (
+                      <>
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => { setRenamingGroupId(group.id); setRenameValue(group.name) }}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-destructive hover:text-destructive/80 transition-colors"
+                          disabled={deletingGroupId === group.id}
+                          onClick={() => handleDeleteGroup(group.id)}
+                        >
+                          {deletingGroupId === group.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Members in this group */}
+              {groupMembers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No players in this group yet.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {groupMembers.map(m => (
+                    <div key={m.id} className="flex items-center justify-between gap-2">
+                      <span className="text-sm truncate">{displayName(m)}</span>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                        onClick={() => handleRemoveFromGroup(group.id, m.id)}
+                        aria-label={`Remove ${displayName(m)}`}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add players button */}
+              {!isFull && nonMembers.length > 0 && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => { setAddMembersSelected(new Set()); setAddMembersGroupId(group.id) }}
+                >
+                  + Add players
+                </button>
+              )}
+              {isFull && (
+                <p className="text-xs text-amber-600">Group is full (max 4). Remove a player to add another.</p>
+              )}
             </div>
-          </div>
-        ))}
-      </div>
+          )
+        })}
+
+          {/* Create new group */}
+          {showNewGroupInput ? (
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Group name (e.g. Weekend Crew)"
+                value={newGroupName}
+                onChange={e => setNewGroupName(e.target.value)}
+                className="h-9 text-sm flex-1"
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateGroup(); if (e.key === 'Escape') setShowNewGroupInput(false) }}
+                autoFocus
+              />
+              <Button size="sm" onClick={handleCreateGroup} disabled={creatingGroup || !newGroupName.trim()}>
+                {creatingGroup ? 'Creating…' : 'Create'}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowNewGroupInput(false); setNewGroupName('') }}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setShowNewGroupInput(true)}
+            >
+              + Create new group
+            </button>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Add Members to Group Dialog */}
+      {(() => {
+        const targetGroup = rosterGroups.find(g => g.id === addMembersGroupId)
+        const eligibleMembers = targetGroup
+          ? members.filter(m => !targetGroup.memberIds.includes(m.id))
+          : []
+        const spotsLeft = targetGroup ? 4 - targetGroup.memberIds.length : 0
+        return (
+          <Dialog open={!!addMembersGroupId} onOpenChange={open => { if (!open) { setAddMembersGroupId(null); setAddMembersSelected(new Set()) } }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add Players to {targetGroup?.name ?? 'Group'}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                {eligibleMembers.length === 0 || spotsLeft === 0 ? (
+                  <p className="text-sm text-muted-foreground">This group is full (max 4 players).</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground pb-1">{spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} remaining.</p>
+                    {eligibleMembers.map(m => {
+                      const checked = addMembersSelected.has(m.id)
+                      const wouldExceed = !checked && addMembersSelected.size >= spotsLeft
+                      return (
+                        <label key={m.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 cursor-pointer select-none transition-colors ${checked ? 'border-primary bg-primary/5' : 'border-border'} ${wouldExceed ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-primary"
+                            checked={checked}
+                            disabled={wouldExceed}
+                            onChange={() => {
+                              setAddMembersSelected(prev => {
+                                const next = new Set(prev)
+                                if (next.has(m.id)) next.delete(m.id)
+                                else next.add(m.id)
+                                return next
+                              })
+                            }}
+                          />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{displayName(m)}</p>
+                            <p className="text-xs text-muted-foreground truncate">{displayEmail(m)}</p>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </>
+                )}
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => { setAddMembersGroupId(null); setAddMembersSelected(new Set()) }}>
+                  {addMembersSelected.size === 0 ? 'Close' : 'Cancel'}
+                </Button>
+                {addMembersSelected.size > 0 && (
+                  <Button onClick={handleAddMembersToGroup}>
+                    Add {addMembersSelected.size} Player{addMembersSelected.size !== 1 ? 's' : ''}
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )
+      })()}
 
       {/* Add Player Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Add Player</DialogTitle></DialogHeader>
-          <PlayerForm
-            form={addForm}
-            onChange={setAddForm}
-            error={addError}
-            isActive={false}
-          />
+          <div className="space-y-4 py-2">
+            {addError && (
+              <div className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                {addError}
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="pf-name">Full Name</Label>
+              <Input id="pf-name" placeholder="Jane Smith" value={addForm.name}
+                onChange={e => setAddForm({ ...addForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pf-email">Email</Label>
+              <Input id="pf-email" type="email" placeholder="jane@example.com" value={addForm.email}
+                onChange={e => setAddForm({ ...addForm, email: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pf-phone">Phone <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input id="pf-phone" type="tel" placeholder="+1 555 000 0000" value={addForm.phone}
+                onChange={e => setAddForm({ ...addForm, phone: e.target.value })} />
+            </div>
+            {!defaultGroupFull && defaultGroup && (
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-border accent-primary"
+                  checked={addForm.addToDefault}
+                  onChange={e => setAddForm({ ...addForm, addToDefault: e.target.checked })}
+                />
+                <span className="text-sm">Place in Default group</span>
+              </label>
+            )}
+          </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setAddOpen(false)} disabled={addSaving}>Cancel</Button>
             <Button onClick={handleAdd} disabled={addSaving}>{addSaving ? 'Adding...' : 'Add Player'}</Button>
@@ -324,13 +581,42 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
             </div>
           ) : (
             <>
-              <PlayerForm
-                form={editForm}
-                onChange={setEditForm}
-                error={editError}
-                isActive={!!editMember && isActive(editMember)}
-                showAdminToggle
-              />
+              <div className="space-y-4 py-2">
+                {editError && (
+                  <div className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                    {editError}
+                  </div>
+                )}
+                {editMember && isActive(editMember) && (
+                  <p className="text-sm text-muted-foreground">
+                    This player has an active account. Name and email are managed by the player.
+                  </p>
+                )}
+                <div className="space-y-1.5">
+                  <Label htmlFor="ef-name">Full Name</Label>
+                  <Input id="ef-name" value={editForm.name} disabled={!!editMember && isActive(editMember)}
+                    onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ef-email">Email</Label>
+                  <Input id="ef-email" type="email" value={editForm.email} disabled={!!editMember && isActive(editMember)}
+                    onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ef-phone">Phone <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input id="ef-phone" type="tel" value={editForm.phone}
+                    onChange={e => setEditForm({ ...editForm, phone: e.target.value })} />
+                </div>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-border accent-primary"
+                    checked={editForm.isAdmin}
+                    onChange={e => setEditForm({ ...editForm, isAdmin: e.target.checked })}
+                  />
+                  <span className="text-sm">Admin — can create and manage tee times</span>
+                </label>
+              </div>
               <DialogFooter className="gap-2 flex-wrap">
                 <Button variant="destructive" className="sm:mr-auto" onClick={() => setConfirmDelete(true)} disabled={editSaving}>
                   Remove
@@ -346,103 +632,3 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
   )
 }
 
-// ── Core Players info tooltip ─────────────────────────────────────────────────
-
-function CorePlayersInfo() {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
-  return (
-    <div className="relative inline-flex" ref={ref}>
-      <button
-        type="button"
-        aria-label="Core players info"
-        onClick={() => setOpen(v => !v)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        className="text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-          <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clipRule="evenodd" />
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-6 z-50 w-64 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
-          These players will prepopulate your invitation list when you create a new tee time. You can have a maximum of 4 core players.
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Shared form fields ────────────────────────────────────────────────────────
-
-interface PlayerFormProps {
-  form: { name: string; email: string; phone: string; playerType: string; isAdmin: boolean }
-  onChange: (f: { name: string; email: string; phone: string; playerType: string; isAdmin: boolean }) => void
-  error: string | null
-  isActive: boolean
-  showAdminToggle?: boolean
-}
-
-function PlayerForm({ form, onChange, error, isActive, showAdminToggle }: PlayerFormProps) {
-  return (
-    <div className="space-y-4 py-2">
-      {error && (
-        <div className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-      {isActive && (
-        <p className="text-sm text-muted-foreground">
-          This player has an active account. Name and email are managed by the player.
-        </p>
-      )}
-      <div className="space-y-1.5">
-        <Label htmlFor="pf-name">Full Name</Label>
-        <Input id="pf-name" placeholder="Jane Smith" value={form.name} disabled={isActive}
-          onChange={e => onChange({ ...form, name: e.target.value })} />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="pf-email">Email</Label>
-        <Input id="pf-email" type="email" placeholder="jane@example.com" value={form.email} disabled={isActive}
-          onChange={e => onChange({ ...form, email: e.target.value })} />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="pf-phone">Phone <span className="text-muted-foreground font-normal">(optional, for SMS)</span></Label>
-        <Input id="pf-phone" type="tel" placeholder="+1 555 000 0000" value={form.phone}
-          onChange={e => onChange({ ...form, phone: e.target.value })} />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="pf-type">Role</Label>
-        <Select value={form.playerType} onValueChange={v => onChange({ ...form, playerType: v ?? 'core' })}>
-          <SelectTrigger id="pf-type"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="core">Core Player — invited to every tee time</SelectItem>
-            <SelectItem value="backup">Backup — contacted when a slot opens</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      {showAdminToggle && (
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-border accent-primary"
-            checked={form.isAdmin}
-            onChange={e => onChange({ ...form, isAdmin: e.target.checked })}
-          />
-          <span className="text-sm">Admin — can create and manage tee times</span>
-        </label>
-      )}
-    </div>
-  )
-}
