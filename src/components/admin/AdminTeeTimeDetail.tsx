@@ -173,7 +173,6 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
       toast.success('Backup player invited.')
       setSelectedBackup('')
       onRefresh()
-      onClose()
     } catch {
       toast.error('Network error — please try again.')
     } finally {
