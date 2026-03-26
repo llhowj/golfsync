@@ -43,7 +43,7 @@ export async function scrapeTeeTimes(): Promise<ScrapedSlot[]> {
 
       // Advance to the next day — stop if the right arrow is disabled (end of booking window)
       const nextBtn = page.locator('button.a-date-arrow').last()
-      const isDisabled = await nextBtn.evaluate(el => el.classList.contains('mat-button-disabled'))
+      const isDisabled = await nextBtn.evaluate(el => (el as HTMLElement).classList.contains('mat-button-disabled'))
       if (isDisabled) {
         console.log('[scraper] Reached end of booking window.')
         break

@@ -36,7 +36,7 @@ async function run() {
       process.exit(1)
     }
 
-    const result = await res.json()
+    const result = await res.json() as { newAlerts: number; goneAlerts: number }
     console.log(`[scraper] Webhook OK — new alerts: ${result.newAlerts}, gone: ${result.goneAlerts}`)
   } catch (err) {
     console.error('[scraper] Webhook call failed:', err instanceof Error ? err.message : err)
