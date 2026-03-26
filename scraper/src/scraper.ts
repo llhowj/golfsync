@@ -8,11 +8,7 @@ const BOOKING_URL = 'https://crystalsprings.totaleintegrated.net/web/tee-times'
 // (the site enforces the booking window — ~14 days for members).
 // Pure function: no DB calls, no HTTP calls beyond the target site.
 export async function scrapeTeeTimes(): Promise<ScrapedSlot[]> {
-  const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: executablePath || undefined,
-  })
+  const browser = await chromium.launch({ headless: true })
   const slots: ScrapedSlot[] = []
 
   try {
