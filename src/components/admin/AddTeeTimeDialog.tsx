@@ -40,7 +40,10 @@ interface AddTeeTimeDialogProps {
   homeCourse: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess: () => void
+  onSuccess: (teeTimeId: string) => void
+  prefillDate?: string
+  prefillTime?: string
+  prefillCourse?: string
 }
 
 export function AddTeeTimeDialog({
@@ -49,6 +52,9 @@ export function AddTeeTimeDialog({
   open,
   onOpenChange,
   onSuccess,
+  prefillDate,
+  prefillTime,
+  prefillCourse,
 }: AddTeeTimeDialogProps) {
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
@@ -77,9 +83,9 @@ export function AddTeeTimeDialog({
 
   useEffect(() => {
     if (!open) return
-    setCourse(homeCourse)
-    setDate(tomorrowStr)
-    setTime('08:00')
+    setCourse(prefillCourse ?? homeCourse)
+    setDate(prefillDate ?? tomorrowStr)
+    setTime(prefillTime ?? '08:00')
     setMaxSlots(4)
     setNotes('')
     setError(null)
@@ -238,7 +244,7 @@ export function AddTeeTimeDialog({
       })
       window.open(`https://www.google.com/calendar/render?${params.toString()}`, '_blank')
 
-      onSuccess()
+      onSuccess(data.teeTime?.id ?? '')
     } catch {
       setError('Network error — please try again.')
     } finally {

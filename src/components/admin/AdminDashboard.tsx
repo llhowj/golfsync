@@ -167,7 +167,7 @@ export function AdminDashboard({ groupId, memberId, defaultTab }: AdminDashboard
         homeCourse={groupInfo?.home_course ?? ''}
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
-        onSuccess={() => { setAddDialogOpen(false); fetchTeeTimes() }}
+        onSuccess={(_teeTimeId) => { setAddDialogOpen(false); fetchTeeTimes() }}
       />
 
       {/* Detail Sheet */}

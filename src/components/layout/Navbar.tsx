@@ -166,6 +166,14 @@ export function Navbar({ user, adminGroups = [] }: NavbarProps) {
                       Roster{adminGroups.length > 1 ? ` — ${g.name}` : ''}
                     </DropdownMenuItem>
                   ))}
+                  {adminGroups.map((g) => (
+                    <DropdownMenuItem
+                      key={`watch-${g.id}`}
+                      onClick={() => router.push(`/watch?g=${g.id}`)}
+                    >
+                      Tee Time Watch{adminGroups.length > 1 ? ` — ${g.name}` : ''}
+                    </DropdownMenuItem>
+                  ))}
                 </>
               )}
 
