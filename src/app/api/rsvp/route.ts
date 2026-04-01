@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserFromRequest } from '@/lib/get-user'
+import { sendRsvpChangeAlert } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -137,6 +138,42 @@ export async function POST(request: NextRequest) {
       { error: upsertError?.message ?? 'Failed to update RSVP' },
       { status: 500 },
     )
+  }
+
+  // Email admins when a player changes their own RSVP to in or out
+  if (isOwnRecord && (effectiveStatus === 'in' || effectiveStatus === 'out') && previousStatus !== effectiveStatus) {
+    const [teeTimeRes, playerProfileRes, adminMembersRes] = await Promise.all([
+      supabase.from('tee_times').select('date, start_time, course, group_id, groups(name)').eq('id', teeTimeId).maybeSingle(),
+      supabase.from('profiles').select('name, email').eq('id', user.id).maybeSingle(),
+      supabase.from('group_members').select('user_id, invited_email, invited_name').eq('group_id', memberRecord.group_id).eq('is_admin', true),
+    ])
+
+    const teeTime = teeTimeRes.data
+    const playerProfile = playerProfileRes.data
+    const adminMembers = adminMembersRes.data ?? []
+
+    if (teeTime && playerProfile && adminMembers.length > 0) {
+      const adminUserIds = adminMembers.map(a => a.user_id).filter(Boolean) as string[]
+      const { data: adminProfiles } = await supabase.from('profiles').select('id, name, email').in('id', adminUserIds)
+      const groupName = (teeTime.groups as { name: string } | null)?.name ?? 'Your Group'
+
+      await Promise.allSettled(
+        adminMembers
+          .filter(a => a.user_id !== user.id)
+          .map(admin => {
+            const profile = adminProfiles?.find(p => p.id === admin.user_id)
+            const adminEmail = profile?.email ?? admin.invited_email
+            const adminName = profile?.name ?? admin.invited_name ?? 'Admin'
+            if (!adminEmail) return Promise.resolve()
+            return sendRsvpChangeAlert(
+              { name: adminName, email: adminEmail },
+              { name: playerProfile.name, email: playerProfile.email },
+              { teeTimeId, date: teeTime.date, startTime: teeTime.start_time, course: teeTime.course, groupName },
+              effectiveStatus as 'in' | 'out',
+            )
+          })
+      )
+    }
   }
 
   // Notify admins when player requests to rejoin after being 'out'
