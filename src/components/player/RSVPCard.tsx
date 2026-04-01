@@ -37,6 +37,7 @@ interface RSVPCardProps {
   myRsvp: MyRsvp
   confirmedPlayers: ConfirmedPlayer[]
   pendingPlayers?: string[]
+  requestedInCount?: number
   invitedBy?: string | null
   createdByMe?: boolean
   onRsvp: (status: 'in' | 'out' | null, note?: string) => Promise<void>
@@ -69,6 +70,7 @@ export function RSVPCard({
   myRsvp,
   confirmedPlayers,
   pendingPlayers = [],
+  requestedInCount = 0,
   invitedBy,
   createdByMe = false,
   onRsvp,
@@ -315,6 +317,19 @@ export function RSVPCard({
               <p className="text-xs text-blue-600">
                 {pendingProposal.myResponse === 'yes' ? '✓ You agreed — waiting on others.' : '✕ You declined this change.'}
               </p>
+            )}
+          </div>
+        )}
+
+        {createdByMe && requestedInCount > 0 && !isPast && (
+          <div className="flex items-center justify-between gap-2 rounded-md bg-amber-50 border border-amber-300 px-2.5 py-1.5">
+            <p className="text-xs font-semibold text-amber-800">
+              ⏳ {requestedInCount} player{requestedInCount !== 1 ? 's' : ''} requesting to rejoin
+            </p>
+            {onManage && (
+              <button type="button" onClick={onManage} className="text-xs font-medium text-amber-700 hover:text-amber-900 underline-offset-2 hover:underline shrink-0">
+                Manage →
+              </button>
             )}
           </div>
         )}

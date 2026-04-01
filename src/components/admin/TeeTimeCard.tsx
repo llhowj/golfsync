@@ -76,6 +76,11 @@ export function TeeTimeCard({ teeTime, rsvps, onClick }: TeeTimeCardProps) {
             <Badge variant="secondary" className="text-xs font-medium">
               {confirmedCount}/{teeTime.max_slots}
             </Badge>
+            {requestedCount > 0 && (
+              <Badge variant="outline" className="text-xs border-amber-500 text-amber-700 bg-amber-50 font-semibold">
+                Action Required
+              </Badge>
+            )}
             {teeTime.pendingProposal && (
               <Badge variant="outline" className="text-xs border-blue-400 text-blue-600 bg-blue-50">
                 Change Pending

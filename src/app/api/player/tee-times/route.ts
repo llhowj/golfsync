@@ -143,6 +143,8 @@ export async function GET(request: NextRequest) {
           return profile?.name ?? m?.invited_name ?? 'Unknown'
         })
 
+      const requestedInCount = rsvpsForTeeTime.filter((r) => (r.status as string) === 'requested_in').length
+
       const invitedBy = tt.created_by ? (creatorNameById[tt.created_by] ?? null) : null
 
       const rawProposal = proposalByTeeTime[tt.id]
@@ -169,6 +171,7 @@ export async function GET(request: NextRequest) {
         pendingProposal,
         confirmedPlayers,
         pendingPlayers,
+        requestedInCount,
       }
     })
     .filter(Boolean)

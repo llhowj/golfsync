@@ -37,6 +37,7 @@ interface PlayerTeeTime {
   myRsvp: RsvpStatus
   confirmedPlayers: ConfirmedPlayer[]
   pendingPlayers: string[]
+  requestedInCount: number
   pendingProposal: PendingProposal | null
 }
 
@@ -289,6 +290,7 @@ export function PlayerDashboard({ memberIds, adminGroups = [] }: PlayerDashboard
                   myRsvp={tt.myRsvp}
                   confirmedPlayers={tt.confirmedPlayers}
                   pendingPlayers={tt.pendingPlayers}
+                  requestedInCount={tt.requestedInCount}
                   invitedBy={tt.invited_by}
                   createdByMe={tt.created_by_me}
                   onRsvp={(status, note) => handleRsvp(tt.id, status, note)}

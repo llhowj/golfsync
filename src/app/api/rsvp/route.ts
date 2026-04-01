@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserFromRequest } from '@/lib/get-user'
-import { sendRsvpChangeAlert } from '@/lib/email'
+import { sendRsvpChangeAlert, sendRequestedInAlert, sendRejoinAcceptedEmail, sendRejoinDeclinedEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -140,6 +140,25 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Email player when admin accepts or declines their requested_in
+  if (isAdmin && (previousStatus as string) === 'requested_in' && (effectiveStatus === 'in' || effectiveStatus === 'out')) {
+    const [teeTimeRes, playerProfileRes] = await Promise.all([
+      supabase.from('tee_times').select('date, start_time, course, groups(name)').eq('id', teeTimeId).maybeSingle(),
+      supabase.from('profiles').select('name, email').eq('id', memberRecord.user_id!).maybeSingle(),
+    ])
+    const teeTime = teeTimeRes.data
+    const playerProfile = playerProfileRes.data
+    if (teeTime && playerProfile?.email) {
+      const groupName = (teeTime.groups as { name: string } | null)?.name ?? 'Your Group'
+      const emailData = { teeTimeId, date: teeTime.date, startTime: teeTime.start_time, course: teeTime.course, groupName }
+      if (effectiveStatus === 'in') {
+        await sendRejoinAcceptedEmail({ name: playerProfile.name, email: playerProfile.email }, emailData)
+      } else {
+        await sendRejoinDeclinedEmail({ name: playerProfile.name, email: playerProfile.email }, emailData)
+      }
+    }
+  }
+
   // Email admins when a player changes their own RSVP to in or out
   if (isOwnRecord && (effectiveStatus === 'in' || effectiveStatus === 'out') && previousStatus !== effectiveStatus) {
     const [teeTimeRes, playerProfileRes, adminMembersRes] = await Promise.all([
@@ -178,25 +197,45 @@ export async function POST(request: NextRequest) {
 
   // Notify admins when player requests to rejoin after being 'out'
   if (effectiveStatus === 'requested_in') {
-    const { data: admins } = await supabase
-      .from('group_members')
-      .select('id, invited_name, invited_email')
-      .eq('group_id', memberRecord.group_id)
-      .eq('is_admin', true)
+    const [teeTimeRes, playerProfileRes, adminMembersRes] = await Promise.all([
+      supabase.from('tee_times').select('date, start_time, course, groups(name)').eq('id', teeTimeId).maybeSingle(),
+      supabase.from('profiles').select('name, email').eq('id', user.id).maybeSingle(),
+      supabase.from('group_members').select('id, user_id, invited_name, invited_email').eq('group_id', memberRecord.group_id).eq('is_admin', true),
+    ])
 
-    console.log(
-      `[rsvp POST] ${memberRecord.invited_name ?? 'A player'} requested to rejoin tee time ${teeTimeId}.`,
-    )
+    const teeTime = teeTimeRes.data
+    const playerProfile = playerProfileRes.data
+    const adminMembers = adminMembersRes.data ?? []
 
-    if (admins && admins.length > 0) {
+    if (teeTime && playerProfile && adminMembers.length > 0) {
+      const adminUserIds = adminMembers.map(a => a.user_id).filter(Boolean) as string[]
+      const { data: adminProfiles } = await supabase.from('profiles').select('id, name, email').in('id', adminUserIds)
+      const groupName = (teeTime.groups as { name: string } | null)?.name ?? 'Your Group'
+
+      await Promise.allSettled(
+        adminMembers
+          .filter(a => a.user_id !== user.id)
+          .map(admin => {
+            const profile = adminProfiles?.find(p => p.id === admin.user_id)
+            const adminEmail = profile?.email ?? admin.invited_email
+            const adminName = profile?.name ?? admin.invited_name ?? 'Admin'
+            if (!adminEmail) return Promise.resolve()
+            return sendRequestedInAlert(
+              { name: adminName, email: adminEmail },
+              { name: playerProfile.name, email: playerProfile.email },
+              { teeTimeId, date: teeTime.date, startTime: teeTime.start_time, course: teeTime.course, groupName },
+            )
+          })
+      )
+
       await supabase.from('notifications').insert(
-        admins.map((admin) => ({
+        adminMembers.map((admin) => ({
           member_id: admin.id,
           tee_time_id: teeTimeId,
           type: 'rsvp_change' as const,
           channel: 'email' as const,
           payload: {
-            changed_by_name: memberRecord.invited_name,
+            changed_by_name: playerProfile.name,
             from_status: previousStatus,
             to_status: 'requested_in',
             note: note ?? null,

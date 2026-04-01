@@ -166,7 +166,7 @@ export function Navbar({ user, adminGroups = [] }: NavbarProps) {
                       Roster{adminGroups.length > 1 ? ` — ${g.name}` : ''}
                     </DropdownMenuItem>
                   ))}
-                  {adminGroups.map((g) => (
+                  {process.env.NEXT_PUBLIC_WATCH_ENABLED === 'true' && adminGroups.map((g) => (
                     <DropdownMenuItem
                       key={`watch-${g.id}`}
                       onClick={() => router.push(`/watch?g=${g.id}`)}

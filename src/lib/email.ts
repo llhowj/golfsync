@@ -314,6 +314,99 @@ export async function sendProposalAcceptedEmail(
   })
 }
 
+// ── Player requested to rejoin alert to admin ────────────────────────────
+
+export async function sendRequestedInAlert(
+  admin: Recipient,
+  player: Recipient,
+  data: TeeTimeEmailData,
+) {
+  if (!isConfigured()) {
+    logEmail(admin.email, `${player.name} wants back in — ${formatDate(data.date)}`, { player: player.name, ...data })
+    return
+  }
+
+  const dashboardUrl = `${APP_URL}/dashboard`
+
+  await getResend().emails.send({
+    from: FROM,
+    to: admin.email,
+    subject: `${player.name} wants back in — ${formatDate(data.date)}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="margin-bottom:4px">⏳ Rejoin Request</h2>
+        <p><strong>${player.name}</strong> has requested to rejoin the tee time on <strong>${formatDate(data.date)}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px 0;color:#666;width:80px">Date</td><td style="padding:8px 0">${formatDate(data.date)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Time</td><td style="padding:8px 0">${formatTime(data.startTime)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Course</td><td style="padding:8px 0">${data.course}</td></tr>
+        </table>
+        <p style="font-size:14px;color:#555">Open the dashboard to accept or decline.</p>
+        <a href="${dashboardUrl}" style="display:inline-block;background:#18181b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Open Dashboard</a>
+      </div>
+    `,
+  })
+}
+
+// ── Admin accepted/declined rejoin request ────────────────────────────────
+
+export async function sendRejoinAcceptedEmail(
+  player: Recipient,
+  data: TeeTimeEmailData,
+) {
+  if (!isConfigured()) {
+    logEmail(player.email, `✅ You're back in — ${formatDate(data.date)}`, { player: player.name, ...data })
+    return
+  }
+
+  const teeTimeUrl = `${APP_URL}/dashboard`
+
+  await getResend().emails.send({
+    from: FROM,
+    to: player.email,
+    subject: `✅ You're back in — ${formatDate(data.date)}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="margin-bottom:4px">✅ You're Back In!</h2>
+        <p>Hi ${player.name}, your request to rejoin has been approved.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px 0;color:#666;width:80px">Date</td><td style="padding:8px 0;font-weight:600">${formatDate(data.date)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Time</td><td style="padding:8px 0;font-weight:600">${formatTime(data.startTime)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Course</td><td style="padding:8px 0;font-weight:600">${data.course}</td></tr>
+        </table>
+        <a href="${teeTimeUrl}" style="display:inline-block;background:#18181b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">View Tee Time</a>
+      </div>
+    `,
+  })
+}
+
+export async function sendRejoinDeclinedEmail(
+  player: Recipient,
+  data: TeeTimeEmailData,
+) {
+  if (!isConfigured()) {
+    logEmail(player.email, `Your request to rejoin was declined — ${formatDate(data.date)}`, { player: player.name, ...data })
+    return
+  }
+
+  await getResend().emails.send({
+    from: FROM,
+    to: player.email,
+    subject: `Your request to rejoin was declined — ${formatDate(data.date)}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="margin-bottom:4px">Request Declined</h2>
+        <p>Hi ${player.name}, your request to rejoin the following tee time was declined.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px 0;color:#666;width:80px">Date</td><td style="padding:8px 0">${formatDate(data.date)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Time</td><td style="padding:8px 0">${formatTime(data.startTime)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Course</td><td style="padding:8px 0">${data.course}</td></tr>
+        </table>
+      </div>
+    `,
+  })
+}
+
 // ── RSVP change alert to admin ────────────────────────────────────────────
 
 export async function sendRsvpChangeAlert(

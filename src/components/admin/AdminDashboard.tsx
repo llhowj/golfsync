@@ -11,7 +11,7 @@ import { ManageRosterTab } from '@/components/admin/ManageRosterTab'
 
 interface RsvpWithMember {
   id: string
-  status: 'in' | 'out' | 'pending'
+  status: 'in' | 'out' | 'pending' | 'requested_in'
   note: string | null
   member: {
     id: string
