@@ -30,7 +30,7 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
   // Find the member record for this user in the tee time's group
   const { data: member } = await adminSupabase
     .from('group_members')
-    .select('id, group_id, invited_name, player_type')
+    .select('id, group_id, invited_name')
     .eq('user_id', user.id)
     .eq('group_id', teeTime.group_id)
     .maybeSingle()

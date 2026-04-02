@@ -39,25 +39,24 @@ export async function POST(
 
   if (!adminCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Verify member is a backup in this group
   const { data: member } = await adminSupabase
     .from('group_members')
-    .select('id, invited_name, invited_email, player_type, profiles(name, email)')
+    .select('id, invited_name, invited_email, profiles(name, email)')
     .eq('id', memberId)
     .eq('group_id', teeTime.group_id)
     .maybeSingle()
 
   if (!member) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
 
-  // Check open slots
-  const { count: inCount } = await adminSupabase
+  // Enforce cap: active invites (non-out) must not exceed max_slots
+  const { count: activeInvites } = await adminSupabase
     .from('rsvps')
     .select('id', { count: 'exact', head: true })
     .eq('tee_time_id', id)
-    .eq('status', 'in')
+    .neq('status', 'out')
 
-  if ((inCount ?? 0) >= teeTime.max_slots) {
-    return NextResponse.json({ error: 'No open slots remaining' }, { status: 409 })
+  if ((activeInvites ?? 0) >= teeTime.max_slots) {
+    return NextResponse.json({ error: 'Tee time is full — no slots available to invite more players' }, { status: 409 })
   }
 
   // Check not already invited
@@ -74,7 +73,6 @@ export async function POST(
   await adminSupabase.from('invites').insert({
     tee_time_id: id,
     member_id: memberId,
-    invite_type: 'backup',
   })
 
   await adminSupabase.from('rsvps').insert({

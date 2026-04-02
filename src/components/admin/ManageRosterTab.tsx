@@ -120,7 +120,6 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
           name: addForm.name.trim(),
           email: addForm.email.trim().toLowerCase(),
           phone: addForm.phone.trim() || null,
-          playerType: 'core',
           addToDefault: addForm.addToDefault,
         }),
       })
@@ -184,7 +183,6 @@ export function ManageRosterTab({ groupId }: ManageRosterTabProps) {
           name: editForm.name.trim(),
           email: editForm.email.trim().toLowerCase(),
           phone: editForm.phone.trim() || null,
-          playerType: 'core',
           isAdmin: editForm.isAdmin,
         }),
       })

@@ -40,7 +40,6 @@ export async function POST(request: NextRequest) {
       group_id: group.id,
       user_id: user.id,
       invited_name: profile?.name ?? user.email?.split('@')[0] ?? 'Admin',
-      player_type: 'core',
       is_admin: true,
     })
     .select()

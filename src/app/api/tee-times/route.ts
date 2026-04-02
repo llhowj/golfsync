@@ -158,22 +158,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: ttError?.message ?? 'Failed to create tee time' }, { status: 500 })
   }
 
-  // Fetch invitees: use explicit list if provided, otherwise all core members
+  // Fetch invitees: use explicit list if provided, otherwise all members
   const membersQuery = adminSupabase
     .from('group_members')
     .select('id, invited_email, invited_name, profiles(name, email)')
     .eq('group_id', groupId)
 
-  const { data: invitees } = inviteeIds && inviteeIds.length > 0
+  const { data: fetchedInvitees } = inviteeIds && inviteeIds.length > 0
     ? await membersQuery.in('id', inviteeIds)
-    : await membersQuery.eq('player_type', 'core')
+    : await membersQuery
 
-  if (invitees && invitees.length > 0) {
+  // Always include the admin who created the tee time
+  const inviteeMap = new Map((fetchedInvitees ?? []).map((m) => [m.id, m]))
+  if (!inviteeMap.has(adminMember.id)) {
+    const { data: adminMemberFull } = await adminSupabase
+      .from('group_members')
+      .select('id, invited_email, invited_name, profiles(name, email)')
+      .eq('id', adminMember.id)
+      .single()
+    if (adminMemberFull) inviteeMap.set(adminMember.id, adminMemberFull)
+  }
+  const invitees = Array.from(inviteeMap.values())
+
+  if (invitees.length > 0) {
     await adminSupabase.from('invites').insert(
       invitees.map((m) => ({
         tee_time_id: teeTime.id,
         member_id: m.id,
-        invite_type: 'core' as const,
       }))
     )
 

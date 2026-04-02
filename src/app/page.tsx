@@ -94,15 +94,7 @@ export default async function LandingPage() {
                   and can RSVP with one tap.
                 </p>
               </div>
-              <div className="flex flex-col items-center text-center gap-3 p-6 rounded-xl bg-background border border-border">
-                <div className="text-4xl">🔄</div>
-                <h3 className="font-semibold text-lg">Auto Backfill</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  When a core player drops out, backup players are automatically
-                  invited to fill the slot.
-                </p>
-              </div>
-              <div className="flex flex-col items-center text-center gap-3 p-6 rounded-xl bg-background border border-border">
+<div className="flex flex-col items-center text-center gap-3 p-6 rounded-xl bg-background border border-border">
                 <div className="text-4xl">📊</div>
                 <h3 className="font-semibold text-lg">Group Insights</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">

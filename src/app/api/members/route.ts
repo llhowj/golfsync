@@ -25,10 +25,8 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await adminSupabase
     .from('group_members')
-    .select('id, player_type, backup_rank, is_admin, invited_name, invited_email, notification_channels, profiles(id, name, email, phone)')
+    .select('id, is_admin, invited_name, invited_email, notification_channels, profiles(id, name, email, phone)')
     .eq('group_id', groupId)
-    .order('player_type', { ascending: true })
-    .order('backup_rank', { ascending: true, nullsFirst: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ members: data })
@@ -40,10 +38,10 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { groupId, name, email, phone, playerType, addToDefault } = body
+  const { groupId, name, email, phone, addToDefault } = body
 
-  if (!groupId || !name || !email || !playerType) {
-    return NextResponse.json({ error: 'groupId, name, email, and playerType are required' }, { status: 400 })
+  if (!groupId || !name || !email) {
+    return NextResponse.json({ error: 'groupId, name, and email are required' }, { status: 400 })
   }
 
   const adminSupabase = createAdminClient()
@@ -59,21 +57,6 @@ export async function POST(request: NextRequest) {
 
   if (!adminCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // If adding a backup, find the next rank
-  let backupRank: number | null = null
-  if (playerType === 'backup') {
-    const { data: existingBackups } = await adminSupabase
-      .from('group_members')
-      .select('backup_rank')
-      .eq('group_id', groupId)
-      .eq('player_type', 'backup')
-      .order('backup_rank', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    backupRank = existingBackups?.backup_rank != null ? existingBackups.backup_rank + 1 : 1
-  }
-
   // Check if a user with this email already exists in profiles
   const { data: existingProfile } = await adminSupabase
     .from('profiles')
@@ -88,11 +71,9 @@ export async function POST(request: NextRequest) {
       user_id: existingProfile?.id ?? null,
       invited_name: name,
       invited_email: existingProfile ? null : email,
-      player_type: playerType,
-      backup_rank: backupRank,
       is_admin: false,
     })
-    .select('id, player_type, backup_rank, invited_name, invited_email, profiles(id, name, email, phone)')
+    .select('id, invited_name, invited_email, profiles(id, name, email, phone)')
     .single()
 
   if (error) {
@@ -152,7 +133,7 @@ export async function PUT(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { memberId, groupId, name, email, phone, playerType, isAdmin } = body
+  const { memberId, groupId, name, email, phone, isAdmin } = body
 
   if (!memberId || !groupId) {
     return NextResponse.json({ error: 'memberId and groupId required' }, { status: 400 })
@@ -173,7 +154,7 @@ export async function PUT(request: NextRequest) {
   // Fetch the member to know if they have an active profile
   const { data: member } = await adminSupabase
     .from('group_members')
-    .select('id, user_id, invited_name, invited_email, player_type')
+    .select('id, user_id, invited_name, invited_email')
     .eq('id', memberId)
     .single()
 
@@ -181,7 +162,6 @@ export async function PUT(request: NextRequest) {
 
   // Update group_members row
   const memberUpdate: Record<string, unknown> = {}
-  if (playerType) memberUpdate.player_type = playerType
   if (typeof isAdmin === 'boolean') memberUpdate.is_admin = isAdmin
   if (!member.user_id) {
     if (name) memberUpdate.invited_name = name.trim()
@@ -238,34 +218,3 @@ export async function DELETE(request: NextRequest) {
   return NextResponse.json({ ok: true })
 }
 
-// PATCH /api/members — update backup rank order
-export async function PATCH(request: NextRequest) {
-  const user = await getUserFromRequest(request)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const body = await request.json()
-  const { groupId, orderedMemberIds } = body
-
-  if (!groupId || !Array.isArray(orderedMemberIds)) {
-    return NextResponse.json({ error: 'groupId and orderedMemberIds required' }, { status: 400 })
-  }
-
-  const adminSupabase = createAdminClient()
-
-  const { data: adminCheck } = await adminSupabase
-    .from('group_members')
-    .select('id')
-    .eq('group_id', groupId)
-    .eq('user_id', user.id)
-    .eq('is_admin', true)
-    .maybeSingle()
-
-  if (!adminCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const updates = orderedMemberIds.map((id: string, index: number) =>
-    adminSupabase.from('group_members').update({ backup_rank: index + 1 }).eq('id', id)
-  )
-
-  await Promise.all(updates)
-  return NextResponse.json({ ok: true })
-}

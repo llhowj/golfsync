@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
 import { AdminDashboard } from '@/components/admin/AdminDashboard'
 import { PlayerDashboard } from '@/components/player/PlayerDashboard'
+import { NoGroupsEmptyState } from '@/components/admin/NoGroupsEmptyState'
 
 interface DashboardPageProps {
   searchParams: Promise<{ g?: string; tab?: string }>
@@ -15,9 +16,21 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login?redirectTo=/dashboard')
 
+  // Link any group_members rows where invited_email matches this user's email.
+  // Covers players who were added to a group after they already had an account
+  // (the signup trigger only fires for new signups).
+  if (user.email) {
+    const adminSupabase = createAdminClient()
+    await adminSupabase
+      .from('group_members')
+      .update({ user_id: user.id, invited_email: null })
+      .eq('invited_email', user.email)
+      .is('user_id', null)
+  }
+
   const { data: members } = await supabase
     .from('group_members')
-    .select('id, group_id, is_admin, player_type, invited_name, groups(id, name, home_course)')
+    .select('id, group_id, is_admin, invited_name, groups(id, name, home_course)')
     .eq('user_id', user.id)
 
   const allMembers = members ?? []
@@ -48,13 +61,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <Navbar user={user} adminGroups={adminGroups} />
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 sm:px-6">
         {allMembers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
-            <div className="text-5xl">⛳</div>
-            <p className="font-semibold text-lg">No groups yet</p>
-            <p className="text-muted-foreground text-sm max-w-xs">
-              You&apos;re not a member of any group yet. Use the menu above to create your own group, or ask an admin to invite you.
-            </p>
-          </div>
+          <NoGroupsEmptyState />
         ) : (
           <div className="space-y-8">
             <PlayerDashboard memberIds={allMembers.map((m) => m.id)} adminGroups={adminGroups} />

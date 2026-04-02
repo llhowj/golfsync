@@ -42,7 +42,6 @@ export type Database = {
       }
       group_members: {
         Row: {
-          backup_rank: number | null
           created_at: string
           group_id: string
           id: string
@@ -50,11 +49,9 @@ export type Database = {
           invited_name: string | null
           is_admin: boolean
           notification_channels: Database["public"]["Enums"]["notification_channel"][]
-          player_type: Database["public"]["Enums"]["player_type"]
           user_id: string | null
         }
         Insert: {
-          backup_rank?: number | null
           created_at?: string
           group_id: string
           id?: string
@@ -62,11 +59,9 @@ export type Database = {
           invited_name?: string | null
           is_admin?: boolean
           notification_channels?: Database["public"]["Enums"]["notification_channel"][]
-          player_type?: Database["public"]["Enums"]["player_type"]
           user_id?: string | null
         }
         Update: {
-          backup_rank?: number | null
           created_at?: string
           group_id?: string
           id?: string
@@ -74,7 +69,6 @@ export type Database = {
           invited_name?: string | null
           is_admin?: boolean
           notification_channels?: Database["public"]["Enums"]["notification_channel"][]
-          player_type?: Database["public"]["Enums"]["player_type"]
           user_id?: string | null
         }
         Relationships: [
@@ -101,7 +95,6 @@ export type Database = {
           deadline_alerts_enabled: boolean
           home_course: string | null
           id: string
-          max_core_players: number
           name: string
         }
         Insert: {
@@ -110,7 +103,6 @@ export type Database = {
           deadline_alerts_enabled?: boolean
           home_course?: string | null
           id?: string
-          max_core_players?: number
           name: string
         }
         Update: {
@@ -119,7 +111,6 @@ export type Database = {
           deadline_alerts_enabled?: boolean
           home_course?: string | null
           id?: string
-          max_core_players?: number
           name?: string
         }
         Relationships: []
@@ -127,7 +118,6 @@ export type Database = {
       invites: {
         Row: {
           id: string
-          invite_type: Database["public"]["Enums"]["invite_type"]
           invited_at: string
           member_id: string
           sequence_num: number | null
@@ -135,7 +125,6 @@ export type Database = {
         }
         Insert: {
           id?: string
-          invite_type: Database["public"]["Enums"]["invite_type"]
           invited_at?: string
           member_id: string
           sequence_num?: number | null
@@ -143,7 +132,6 @@ export type Database = {
         }
         Update: {
           id?: string
-          invite_type?: Database["public"]["Enums"]["invite_type"]
           invited_at?: string
           member_id?: string
           sequence_num?: number | null
@@ -222,7 +210,6 @@ export type Database = {
           attended: boolean
           id: string
           member_id: string
-          player_type: Database["public"]["Enums"]["player_type"]
           recorded_at: string
           tee_time_id: string
         }
@@ -230,7 +217,6 @@ export type Database = {
           attended?: boolean
           id?: string
           member_id: string
-          player_type: Database["public"]["Enums"]["player_type"]
           recorded_at?: string
           tee_time_id: string
         }
@@ -238,7 +224,6 @@ export type Database = {
           attended?: boolean
           id?: string
           member_id?: string
-          player_type?: Database["public"]["Enums"]["player_type"]
           recorded_at?: string
           tee_time_id?: string
         }
@@ -471,20 +456,17 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      invite_type: "core" | "backup"
       notification_channel: "email" | "sms" | "push"
       notification_status: "pending" | "sent" | "failed"
       notification_type:
         | "tee_time_posted"
         | "tee_time_changed"
         | "tee_time_deleted"
-        | "backup_invited"
         | "slot_filled"
         | "rsvp_reminder"
         | "deadline_alert"
         | "rsvp_change"
         | "time_change_poll"
-      player_type: "core" | "backup"
       poll_preference: "new" | "keep" | "no_preference"
       rsvp_status: "in" | "out" | "pending"
     }
@@ -614,21 +596,18 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      invite_type: ["core", "backup"],
       notification_channel: ["email", "sms", "push"],
       notification_status: ["pending", "sent", "failed"],
       notification_type: [
         "tee_time_posted",
         "tee_time_changed",
         "tee_time_deleted",
-        "backup_invited",
         "slot_filled",
         "rsvp_reminder",
         "deadline_alert",
         "rsvp_change",
         "time_change_poll",
       ],
-      player_type: ["core", "backup"],
       poll_preference: ["new", "keep", "no_preference"],
       rsvp_status: ["in", "out", "pending"],
     },

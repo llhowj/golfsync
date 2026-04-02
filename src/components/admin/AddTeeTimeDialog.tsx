@@ -177,7 +177,6 @@ export function AddTeeTimeDialog({
           groupId,
           name: newPlayerName.trim(),
           email: newPlayerEmail.trim().toLowerCase(),
-          playerType: 'core',
         }),
       })
       const data = await res.json()
