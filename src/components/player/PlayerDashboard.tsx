@@ -6,6 +6,7 @@ import { RSVPCard } from '@/components/player/RSVPCard'
 import { AddTeeTimeDialog } from '@/components/admin/AddTeeTimeDialog'
 import { AdminTeeTimeDetail } from '@/components/admin/AdminTeeTimeDetail'
 import { authFetch } from '@/lib/auth-fetch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface RsvpStatus {
   status: 'in' | 'out' | 'pending' | 'requested_in'
@@ -266,64 +267,76 @@ export function PlayerDashboard({ memberIds, adminGroups = [] }: PlayerDashboard
           <SkeletonCard />
           <SkeletonCard />
         </div>
-      ) : upcoming.length === 0 && past.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
-          <div className="text-5xl">⛳</div>
-          <p className="font-semibold text-lg">No tee times yet</p>
-          <p className="text-muted-foreground text-sm max-w-xs">
-            {adminGroups.length > 0
-              ? "Use the Add Tee Time button to schedule your first round."
-              : "Your admin hasn't posted any upcoming rounds. Check back soon!"}
-          </p>
-        </div>
       ) : (
-        <div className="space-y-8">
-          {upcoming.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Upcoming
-              </h2>
-              {upcoming.map((tt) => (
-                <RSVPCard
-                  key={tt.id}
-                  teeTime={tt}
-                  myRsvp={tt.myRsvp}
-                  confirmedPlayers={tt.confirmedPlayers}
-                  pendingPlayers={tt.pendingPlayers}
-                  requestedInCount={tt.requestedInCount}
-                  invitedBy={tt.invited_by}
-                  createdByMe={tt.created_by_me}
-                  onRsvp={(status, note) => handleRsvp(tt.id, status, note)}
-                  pendingProposal={tt.pendingProposal}
-                  onProposalResponse={(proposalId, response) => handleProposalResponse(proposalId, response, tt.member_id)}
-                  onManage={tt.created_by_me ? () => setManagingTeeTimeId(tt.id) : undefined}
-                />
-              ))}
-            </section>
-          )}
+        <Tabs defaultValue="upcoming">
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="upcoming" className="flex-1 sm:flex-none font-semibold uppercase tracking-wider">
+              Upcoming
+            </TabsTrigger>
+            <TabsTrigger value="past" className="flex-1 sm:flex-none font-semibold uppercase tracking-wider">
+              Past Rounds
+            </TabsTrigger>
+          </TabsList>
 
-          {past.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Past Rounds
-              </h2>
-              {past.map((tt) => (
-                <RSVPCard
-                  key={tt.id}
-                  teeTime={tt}
-                  myRsvp={tt.myRsvp}
-                  confirmedPlayers={tt.confirmedPlayers}
-                  pendingPlayers={tt.pendingPlayers}
-                  invitedBy={tt.invited_by}
-                  createdByMe={tt.created_by_me}
-                  onRsvp={(status, note) => handleRsvp(tt.id, status ?? null, note)}
-                  onManage={tt.created_by_me ? () => setManagingTeeTimeId(tt.id) : undefined}
-                  isPast
-                />
-              ))}
-            </section>
-          )}
-        </div>
+          <TabsContent value="upcoming" className="mt-4">
+            {upcoming.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
+                <div className="text-5xl">⛳</div>
+                <p className="font-semibold text-lg">No upcoming tee times</p>
+                <p className="text-muted-foreground text-sm max-w-xs">
+                  {adminGroups.length > 0
+                    ? "Use the Add Tee Time button to schedule your first round."
+                    : "Your admin hasn't posted any upcoming rounds. Check back soon!"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcoming.map((tt) => (
+                  <RSVPCard
+                    key={tt.id}
+                    teeTime={tt}
+                    myRsvp={tt.myRsvp}
+                    confirmedPlayers={tt.confirmedPlayers}
+                    pendingPlayers={tt.pendingPlayers}
+                    requestedInCount={tt.requestedInCount}
+                    invitedBy={tt.invited_by}
+                    createdByMe={tt.created_by_me}
+                    onRsvp={(status, note) => handleRsvp(tt.id, status, note)}
+                    pendingProposal={tt.pendingProposal}
+                    onProposalResponse={(proposalId, response) => handleProposalResponse(proposalId, response, tt.member_id)}
+                    onManage={tt.created_by_me ? () => setManagingTeeTimeId(tt.id) : undefined}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="past" className="mt-4">
+            {past.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
+                <div className="text-5xl">⛳</div>
+                <p className="font-semibold text-lg">No past rounds yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {past.map((tt) => (
+                  <RSVPCard
+                    key={tt.id}
+                    teeTime={tt}
+                    myRsvp={tt.myRsvp}
+                    confirmedPlayers={tt.confirmedPlayers}
+                    pendingPlayers={tt.pendingPlayers}
+                    invitedBy={tt.invited_by}
+                    createdByMe={tt.created_by_me}
+                    onRsvp={(status, note) => handleRsvp(tt.id, status ?? null, note)}
+                    onManage={tt.created_by_me ? () => setManagingTeeTimeId(tt.id) : undefined}
+                    isPast
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       {/* Add Tee Time dialog */}
