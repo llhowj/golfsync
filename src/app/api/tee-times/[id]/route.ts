@@ -81,6 +81,12 @@ export async function DELETE(
 
   if (!adminCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  let comment: string | null = null
+  try {
+    const body = await request.json()
+    comment = body?.comment ?? null
+  } catch { /* body is optional */ }
+
   // Soft-delete the tee time
   await adminSupabase
     .from('tee_times')
@@ -113,6 +119,7 @@ export async function DELETE(
     startTime: teeTime.start_time,
     course: teeTime.course,
     groupName: groupData?.name ?? 'Your Golf Group',
+    comment,
   })
 
   return NextResponse.json({ ok: true })

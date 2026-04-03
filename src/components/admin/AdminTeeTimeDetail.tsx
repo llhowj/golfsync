@@ -98,6 +98,7 @@ function formatTime(timeStr: string): string {
 
 export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: AdminTeeTimeDetailProps) {
   const [cancelling, setCancelling] = useState(false)
+  const [cancelComment, setCancelComment] = useState('')
   const [uninvited, setUninvited] = useState<BackupMember[]>([])
   const [selectedInvitee, setSelectedInvitee] = useState('')
   const [inviting, setInviting] = useState(false)
@@ -228,6 +229,8 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
     try {
       const res = await authFetch(`/api/tee-times/${teeTime.id}`, {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: cancelComment.trim() || null }),
       })
       if (res.ok) {
         toast.success('Tee time cancelled.')
@@ -556,12 +559,18 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                 <AlertDialogHeader>
                   <AlertDialogTitle>Cancel this tee time?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    All players will be notified that this tee time has been cancelled.
-                    This action cannot be undone.
+                    All players will be notified. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <textarea
+                  placeholder="Reason for cancelling (optional) — included in the notification email"
+                  value={cancelComment}
+                  onChange={e => setCancelComment(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Keep It</AlertDialogCancel>
+                  <AlertDialogCancel onClick={() => setCancelComment('')}>Keep It</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleCancel}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

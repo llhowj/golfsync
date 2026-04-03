@@ -40,6 +40,7 @@ interface TeeTimeEmailData {
   course: string
   groupName: string
   notes?: string | null
+  comment?: string | null
 }
 
 interface Recipient {
@@ -118,7 +119,8 @@ export async function sendTeeTimeCancelledEmails(
               <tr><td style="padding:8px 0;color:#666">Time</td><td style="padding:8px 0">${formatTime(data.startTime)}</td></tr>
               <tr><td style="padding:8px 0;color:#666">Course</td><td style="padding:8px 0">${data.course}</td></tr>
             </table>
-            <p>This tee time has been cancelled. No action needed.</p>
+            ${data.comment ? `<p style="margin-top:12px;padding:10px 14px;background:#f5f5f5;border-radius:6px;color:#444">${data.comment}</p>` : ''}
+            <p>This tee time has been cancelled. Please remove it from your calendar.</p>
           </div>
         `,
       })
@@ -402,6 +404,39 @@ export async function sendRejoinDeclinedEmail(
           <tr><td style="padding:8px 0;color:#666">Time</td><td style="padding:8px 0">${formatTime(data.startTime)}</td></tr>
           <tr><td style="padding:8px 0;color:#666">Course</td><td style="padding:8px 0">${data.course}</td></tr>
         </table>
+      </div>
+    `,
+  })
+}
+
+// ── Admin changed a player's RSVP status ─────────────────────────────────
+
+export async function sendAdminRsvpUpdateEmail(
+  player: Recipient,
+  data: TeeTimeEmailData,
+  newStatus: 'in' | 'out',
+) {
+  if (!isConfigured()) {
+    logEmail(player.email, `Your RSVP was updated to ${newStatus.toUpperCase()} — ${formatDate(data.date)}`, { player: player.name, newStatus, ...data })
+    return
+  }
+
+  const isIn = newStatus === 'in'
+  await getResend().emails.send({
+    from: FROM,
+    to: player.email,
+    subject: `Your RSVP was updated — ${formatDate(data.date)} at ${data.course}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="margin-bottom:4px">${isIn ? '✅ You\'re In' : '❌ You\'ve Been Marked Out'}</h2>
+        <p style="color:#666;margin-top:0">${data.groupName}</p>
+        <p>Hi ${player.name}, the admin has updated your RSVP to <strong>${isIn ? '✅ IN' : '❌ OUT'}</strong> for:</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px 0;color:#666;width:80px">Date</td><td style="padding:8px 0;font-weight:600">${formatDate(data.date)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Time</td><td style="padding:8px 0;font-weight:600">${formatTime(data.startTime)}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Course</td><td style="padding:8px 0;font-weight:600">${data.course}</td></tr>
+        </table>
+        <a href="${APP_URL}/dashboard" style="display:inline-block;background:#18181b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">View Dashboard</a>
       </div>
     `,
   })

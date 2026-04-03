@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserFromRequest } from '@/lib/get-user'
-import { sendRsvpChangeAlert, sendRequestedInAlert, sendRejoinAcceptedEmail, sendRejoinDeclinedEmail } from '@/lib/email'
+import { sendRsvpChangeAlert, sendRequestedInAlert, sendRejoinAcceptedEmail, sendRejoinDeclinedEmail, sendAdminRsvpUpdateEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -156,6 +156,26 @@ export async function POST(request: NextRequest) {
       } else {
         await sendRejoinDeclinedEmail({ name: playerProfile.name, email: playerProfile.email }, emailData)
       }
+    }
+  }
+
+  // Email player when admin directly changes their status to in or out (not via requested_in flow)
+  if (isAdmin && (effectiveStatus === 'in' || effectiveStatus === 'out') && previousStatus !== effectiveStatus && (previousStatus as string) !== 'requested_in') {
+    const [teeTimeRes, playerProfileRes] = await Promise.all([
+      supabase.from('tee_times').select('date, start_time, course, groups(name)').eq('id', teeTimeId).maybeSingle(),
+      memberRecord.user_id
+        ? supabase.from('profiles').select('name, email').eq('id', memberRecord.user_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ])
+    const teeTime = teeTimeRes.data
+    const playerProfile = (playerProfileRes as { data: { name: string; email: string } | null }).data
+    if (teeTime && playerProfile?.email) {
+      const groupName = (teeTime.groups as { name: string } | null)?.name ?? 'Your Group'
+      await sendAdminRsvpUpdateEmail(
+        { name: playerProfile.name, email: playerProfile.email },
+        { teeTimeId, date: teeTime.date, startTime: teeTime.start_time, course: teeTime.course, groupName },
+        effectiveStatus as 'in' | 'out',
+      )
     }
   }
 
