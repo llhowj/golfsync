@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const publicPaths = ['/login', '/register', '/forgot-password', '/auth', '/api/debug']
-  const isPublic = publicPaths.some(p => pathname.startsWith(p))
+  const isPublic = pathname === '/' || publicPaths.some(p => pathname.startsWith(p))
 
   // Redirect unauthenticated users away from protected routes
   if (!user && !isPublic) {
