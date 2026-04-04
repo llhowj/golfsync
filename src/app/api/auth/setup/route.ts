@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserFromRequest } from '@/lib/get-user'
+import { sendNewUserAlert } from '@/lib/email'
 
 // Called after registration when email confirmation is disabled.
 // Creates the profile row and links any pending group member invites.
@@ -9,6 +10,9 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const adminSupabase = createAdminClient()
+
+  const { data: existingProfile } = await adminSupabase
+    .from('profiles').select('id').eq('id', user.id).maybeSingle()
 
   await adminSupabase.from('profiles').upsert(
     {
@@ -24,6 +28,12 @@ export async function POST(request: NextRequest) {
     .update({ user_id: user.id, invited_email: null })
     .eq('invited_email', user.email!)
     .is('user_id', null)
+
+  if (!existingProfile) {
+    const { count } = await adminSupabase.from('profiles').select('id', { count: 'exact', head: true })
+    const userName = user.user_metadata?.full_name ?? user.email!.split('@')[0]
+    await sendNewUserAlert(user.email!, userName, count ?? 1).catch(() => {})
+  }
 
   return NextResponse.json({ ok: true })
 }

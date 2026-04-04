@@ -442,6 +442,31 @@ export async function sendAdminRsvpUpdateEmail(
   })
 }
 
+// ── New user registration alert to owner ─────────────────────────────────
+
+export async function sendNewUserAlert(newUserEmail: string, newUserName: string, totalUsers: number) {
+  if (!isConfigured()) {
+    logEmail('hrosenberg@gmail.com', `New GolfSync signup: ${newUserEmail}`, { newUserEmail, newUserName, totalUsers })
+    return
+  }
+
+  await getResend().emails.send({
+    from: 'GolfSync <notifications@golfsync.app>',
+    to: 'hrosenberg@gmail.com',
+    subject: `New signup: ${newUserName} (${newUserEmail})`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="margin-bottom:4px">New GolfSync Signup</h2>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px 0;color:#666;width:80px">Name</td><td style="padding:8px 0;font-weight:600">${newUserName}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Email</td><td style="padding:8px 0;font-weight:600">${newUserEmail}</td></tr>
+          <tr><td style="padding:8px 0;color:#666">Total users</td><td style="padding:8px 0;font-weight:600">${totalUsers}</td></tr>
+        </table>
+      </div>
+    `,
+  })
+}
+
 // ── RSVP change alert to admin ────────────────────────────────────────────
 
 export async function sendRsvpChangeAlert(

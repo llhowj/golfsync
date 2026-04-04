@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sendNewUserAlert } from '@/lib/email'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -14,7 +15,10 @@ export async function GET(request: Request) {
     if (!error && data.user) {
       const adminSupabase = createAdminClient()
 
-      // Ensure a profile row exists
+      // Ensure a profile row exists — check first to detect new signups
+      const { data: existingProfile } = await adminSupabase
+        .from('profiles').select('id').eq('id', data.user.id).maybeSingle()
+
       await adminSupabase.from('profiles').upsert(
         {
           id: data.user.id,
@@ -23,6 +27,12 @@ export async function GET(request: Request) {
         },
         { onConflict: 'id', ignoreDuplicates: true }
       )
+
+      if (!existingProfile) {
+        const { count } = await adminSupabase.from('profiles').select('id', { count: 'exact', head: true })
+        const userName = data.user.user_metadata?.full_name ?? data.user.email!.split('@')[0]
+        await sendNewUserAlert(data.user.email!, userName, count ?? 1).catch(() => {})
+      }
 
       // Link any pending group_members records that were invited by this email
       await adminSupabase
