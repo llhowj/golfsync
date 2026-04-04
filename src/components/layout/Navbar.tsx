@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 
 interface NavbarProps {
@@ -60,10 +61,38 @@ export function Navbar({ user, adminGroups = [] }: NavbarProps) {
   const [homeCourse, setHomeCourse] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [sendingFeedback, setSendingFeedback] = useState(false)
+
   async function handleSignOut() {
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
+  }
+
+  async function handleFeedback(e: React.FormEvent) {
+    e.preventDefault()
+    if (!feedbackMessage.trim()) return
+    setSendingFeedback(true)
+    try {
+      const res = await authFetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: feedbackMessage.trim() }),
+      })
+      if (!res.ok) {
+        toast.error('Failed to send. Please try again.')
+        return
+      }
+      toast.success('Thanks — your feedback has been sent.')
+      setFeedbackOpen(false)
+      setFeedbackMessage('')
+    } catch {
+      toast.error('Something went wrong. Please try again.')
+    } finally {
+      setSendingFeedback(false)
+    }
   }
 
   async function handleCreateGroup(e: React.FormEvent) {
@@ -179,6 +208,12 @@ export function Navbar({ user, adminGroups = [] }: NavbarProps) {
 
               <DropdownMenuSeparator />
 
+              <DropdownMenuItem onClick={() => setFeedbackOpen(true)}>
+                Report an Issue
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
               <DropdownMenuItem
                 onClick={handleSignOut}
                 variant="destructive"
@@ -190,6 +225,38 @@ export function Navbar({ user, adminGroups = [] }: NavbarProps) {
           </DropdownMenu>
         </div>
       </header>
+
+      <Dialog open={feedbackOpen} onOpenChange={(open) => { setFeedbackOpen(open); if (!open) setFeedbackMessage('') }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report an Issue</DialogTitle>
+            <DialogDescription>
+              Describe the bug or share a suggestion. We&apos;ll get back to you at {user.email}.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleFeedback} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="feedback-message">Your message <span className="text-destructive">*</span></Label>
+              <Textarea
+                id="feedback-message"
+                value={feedbackMessage}
+                onChange={(e) => setFeedbackMessage(e.target.value)}
+                placeholder="What's happening, or what would you like to see?"
+                rows={5}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setFeedbackOpen(false); setFeedbackMessage('') }} disabled={sendingFeedback}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={sendingFeedback || !feedbackMessage.trim()}>
+                {sendingFeedback ? 'Sending…' : 'Send Feedback'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
         <DialogContent>
