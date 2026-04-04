@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { CourseLink } from '@/components/ui/CourseLink'
 
 interface TeeTimeInfo {
   id: string
@@ -157,7 +158,7 @@ export function RSVPCard({
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-xs text-muted-foreground">
-                {formatTime(teeTime.start_time)} &bull; {teeTime.course}
+                {formatTime(teeTime.start_time)} &bull; <CourseLink course={teeTime.course} className="underline underline-offset-2 hover:text-foreground transition-colors" />
               </p>
               {myRsvp.status === 'in' && !isPast && (
                 <a href={buildGoogleCalendarUrl()} target="_blank" rel="noopener noreferrer"

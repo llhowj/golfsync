@@ -28,6 +28,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { CourseLink } from '@/components/ui/CourseLink'
 
 interface RsvpEntry {
   id?: string
@@ -253,7 +254,7 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
         <DialogHeader>
           <DialogTitle>{formatDate(teeTime.date)}</DialogTitle>
           <DialogDescription>
-            {formatTime(teeTime.start_time)} &bull; {teeTime.course}
+            {formatTime(teeTime.start_time)} &bull; <CourseLink course={teeTime.course} className="underline underline-offset-2 hover:text-foreground transition-colors" />
           </DialogDescription>
         </DialogHeader>
 
