@@ -15,10 +15,7 @@ export async function GET(request: Request) {
     if (!error && data.user) {
       const adminSupabase = createAdminClient()
 
-      // Ensure a profile row exists — check first to detect new signups
-      const { data: existingProfile } = await adminSupabase
-        .from('profiles').select('id').eq('id', data.user.id).maybeSingle()
-
+      // Ensure a profile row exists
       await adminSupabase.from('profiles').upsert(
         {
           id: data.user.id,
@@ -28,10 +25,13 @@ export async function GET(request: Request) {
         { onConflict: 'id', ignoreDuplicates: true }
       )
 
-      if (!existingProfile) {
+      // Send new user alert if this is a fresh signup (created within the last 5 minutes)
+      const createdAt = new Date(data.user.created_at).getTime()
+      const isNewUser = Date.now() - createdAt < 5 * 60 * 1000
+      if (isNewUser) {
         const { count } = await adminSupabase.from('profiles').select('id', { count: 'exact', head: true })
         const userName = data.user.user_metadata?.full_name ?? data.user.email!.split('@')[0]
-        await sendNewUserAlert(data.user.email!, userName, count ?? 1).catch(() => {})
+        await sendNewUserAlert(data.user.email!, userName, count ?? 1).catch(console.error)
       }
 
       // Link any pending group_members records that were invited by this email

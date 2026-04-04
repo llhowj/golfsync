@@ -11,9 +11,6 @@ export async function POST(request: NextRequest) {
 
   const adminSupabase = createAdminClient()
 
-  const { data: existingProfile } = await adminSupabase
-    .from('profiles').select('id').eq('id', user.id).maybeSingle()
-
   await adminSupabase.from('profiles').upsert(
     {
       id: user.id,
@@ -29,10 +26,13 @@ export async function POST(request: NextRequest) {
     .eq('invited_email', user.email!)
     .is('user_id', null)
 
-  if (!existingProfile) {
+  // Send new user alert if this is a fresh signup (created within the last 5 minutes)
+  const createdAt = new Date(user.created_at).getTime()
+  const isNewUser = Date.now() - createdAt < 5 * 60 * 1000
+  if (isNewUser) {
     const { count } = await adminSupabase.from('profiles').select('id', { count: 'exact', head: true })
     const userName = user.user_metadata?.full_name ?? user.email!.split('@')[0]
-    await sendNewUserAlert(user.email!, userName, count ?? 1).catch(() => {})
+    await sendNewUserAlert(user.email!, userName, count ?? 1).catch(console.error)
   }
 
   return NextResponse.json({ ok: true })
