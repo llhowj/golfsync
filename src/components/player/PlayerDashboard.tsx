@@ -329,7 +329,6 @@ export function PlayerDashboard({ memberIds, adminGroups = [] }: PlayerDashboard
                     invitedBy={tt.invited_by}
                     createdByMe={tt.created_by_me}
                     onRsvp={(status, note) => handleRsvp(tt.id, status ?? null, note)}
-                    onManage={tt.created_by_me ? () => setManagingTeeTimeId(tt.id) : undefined}
                     isPast
                   />
                 ))}
