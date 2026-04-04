@@ -350,6 +350,17 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
           })()}
 
 
+          {/* Edit tee time text link */}
+          {!teeTime.deleted_at && !showEdit && !teeTime.pendingProposal && (
+            <button
+              type="button"
+              onClick={() => { setShowEdit(true); setProposeError(null) }}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Edit tee time
+            </button>
+          )}
+
           {showEdit && (
             <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Propose Change</p>
@@ -628,18 +639,9 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
 
           <Separator />
 
-          {/* Edit / Cancel buttons */}
-          {!teeTime.deleted_at && (
-            <div className="flex gap-2">
-              {!teeTime.pendingProposal && (
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => { setShowEdit(v => !v); setProposeError(null) }}
-                >
-                  {showEdit ? 'Hide Edit' : 'Edit Tee Time'}
-                </Button>
-              )}
+          {/* Cancel / Close buttons */}
+          <div className="flex gap-2">
+            {!teeTime.deleted_at && (
               <AlertDialog>
               <AlertDialogTrigger
                 className={cn(buttonVariants({ variant: 'outline' }), 'flex-1 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive')}
@@ -672,8 +674,14 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            </div>
-          )}
+            )}
+            <Button
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              onClick={onClose}
+            >
+              Close
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
