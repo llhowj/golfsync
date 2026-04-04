@@ -104,6 +104,9 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
   const [selectedInvitee, setSelectedInvitee] = useState('')
   const [inviting, setInviting] = useState(false)
   const [togglingMemberId, setTogglingMemberId] = useState<string | null>(null)
+  const [inviteMode, setInviteMode] = useState<'roster' | 'new'>('roster')
+  const [newPlayerName, setNewPlayerName] = useState('')
+  const [newPlayerEmail, setNewPlayerEmail] = useState('')
 
   // Edit / propose change
   const [showEdit, setShowEdit] = useState(false)
@@ -177,6 +180,39 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
       if (!res.ok) { toast.error(data.error ?? 'Failed to invite player.'); return }
       toast.success('Player invited.')
       setSelectedInvitee('')
+      onRefresh()
+    } catch {
+      toast.error('Network error — please try again.')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  async function handleInviteNewPlayer() {
+    if (!newPlayerName.trim() || !newPlayerEmail.trim()) return
+    setInviting(true)
+    try {
+      // First add to group
+      const addRes = await authFetch('/api/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId, name: newPlayerName.trim(), email: newPlayerEmail.trim() }),
+      })
+      const addData = await addRes.json()
+      if (!addRes.ok) { toast.error(addData.error ?? 'Failed to add player.'); return }
+
+      // Then invite to this tee time
+      const inviteRes = await authFetch(`/api/tee-times/${teeTime.id}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: addData.member.id }),
+      })
+      const inviteData = await inviteRes.json()
+      if (!inviteRes.ok) { toast.error(inviteData.error ?? 'Failed to invite player.'); return }
+
+      toast.success(`${newPlayerName.trim()} added and invited.`)
+      setNewPlayerName('')
+      setNewPlayerEmail('')
       onRefresh()
     } catch {
       toast.error('Network error — please try again.')
@@ -515,32 +551,87 @@ export function AdminTeeTimeDetail({ teeTime, groupId, onClose, onRefresh }: Adm
           )}
 
           {/* Invite player */}
-          {!teeTime.deleted_at && isUpcoming && inviteSlots > 0 && uninvited.length > 0 && (
+          {!teeTime.deleted_at && isUpcoming && inviteSlots > 0 && (
             <>
               <Separator />
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Invite Player
-                </p>
-                <div className="flex gap-2">
-                  <Select value={selectedInvitee} onValueChange={(v) => setSelectedInvitee(v ?? '')}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue>
-                        {selectedInvitee
-                          ? (uninvited.find(m => m.id === selectedInvitee)?.name ?? 'Player')
-                          : <span className="text-muted-foreground">Select player...</span>}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {uninvited.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={handleInviteBackup} disabled={!selectedInvitee || inviting} size="sm">
-                    {inviting ? 'Inviting...' : 'Invite'}
-                  </Button>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Invite Player
+                  </p>
+                  <div className="flex gap-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setInviteMode('roster')}
+                      className={`px-2 py-0.5 rounded transition-colors ${inviteMode === 'roster' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      From Roster
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInviteMode('new')}
+                      className={`px-2 py-0.5 rounded transition-colors ${inviteMode === 'new' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      New Player
+                    </button>
+                  </div>
                 </div>
+
+                {inviteMode === 'roster' && (
+                  uninvited.length > 0 ? (
+                    <div className="flex gap-2">
+                      <Select value={selectedInvitee} onValueChange={(v) => setSelectedInvitee(v ?? '')}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue>
+                            {selectedInvitee
+                              ? (uninvited.find(m => m.id === selectedInvitee)?.name ?? 'Player')
+                              : <span className="text-muted-foreground">Select player...</span>}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {uninvited.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button onClick={handleInviteBackup} disabled={!selectedInvitee || inviting} size="sm">
+                        {inviting ? 'Inviting...' : 'Invite'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">All roster players are already invited. Use &ldquo;New Player&rdquo; to add someone new.</p>
+                  )
+                )}
+
+                {inviteMode === 'new' && (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Name"
+                        value={newPlayerName}
+                        onChange={e => setNewPlayerName(e.target.value)}
+                        className="h-8 text-sm"
+                        disabled={inviting}
+                      />
+                      <Input
+                        placeholder="Email"
+                        type="email"
+                        value={newPlayerEmail}
+                        onChange={e => setNewPlayerEmail(e.target.value)}
+                        className="h-8 text-sm"
+                        disabled={inviting}
+                      />
+                    </div>
+                    <Button
+                      onClick={handleInviteNewPlayer}
+                      disabled={!newPlayerName.trim() || !newPlayerEmail.trim() || inviting}
+                      size="sm"
+                    >
+                      {inviting ? 'Adding...' : 'Add & Invite'}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">This will add them to your roster and invite them to this tee time.</p>
+                  </div>
+                )}
               </div>
             </>
           )}
