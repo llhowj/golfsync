@@ -196,11 +196,10 @@ export async function POST(request: NextRequest) {
       }))
     )
 
-    const { data: groupData } = await adminSupabase
-      .from('groups')
-      .select('name')
-      .eq('id', groupId)
-      .single()
+    const [{ data: groupData }, { data: adminProfile }] = await Promise.all([
+      adminSupabase.from('groups').select('name').eq('id', groupId).single(),
+      adminSupabase.from('profiles').select('name').eq('id', user.id).maybeSingle(),
+    ])
 
     const recipients = invitees
       .filter((m) => m.id !== adminMember.id)
@@ -219,6 +218,7 @@ export async function POST(request: NextRequest) {
       course: teeTime.course,
       groupName: groupData?.name ?? 'Your Golf Group',
       notes: teeTime.notes,
+      adminName: adminProfile?.name ?? null,
     })
   }
 

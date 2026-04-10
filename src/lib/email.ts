@@ -41,6 +41,7 @@ interface TeeTimeEmailData {
   groupName: string
   notes?: string | null
   comment?: string | null
+  adminName?: string | null
 }
 
 interface Recipient {
@@ -76,9 +77,9 @@ export async function sendTeeTimePostedEmails(
               <tr><td style="padding:8px 0;color:#666">Time</td><td style="padding:8px 0;font-weight:600">${formatTime(data.startTime)}</td></tr>
               <tr><td style="padding:8px 0;color:#666">Course</td><td style="padding:8px 0;font-weight:600">${data.course}</td></tr>
             </table>
-            ${data.notes ? `<p style="background:#f4f4f5;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:14px;color:#444"><strong>Note from your admin:</strong><br>${data.notes}</p>` : ''}
+            ${data.notes ? `<p style="background:#f4f4f5;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:14px;color:#444">${data.adminName ? `<strong>${data.adminName} says:</strong>` : '<strong>Note:</strong>'}<br>${data.notes}</p>` : ''}
             <a href="${rsvpUrl}" style="display:inline-block;background:#18181b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">RSVP Now</a>
-            <p style="color:#999;font-size:12px;margin-top:24px">You're receiving this because you're a member of ${data.groupName} on GolfSync.</p>
+            <p style="color:#999;font-size:12px;margin-top:24px">This invite was sent by ${data.adminName ?? 'your group admin'} via GolfSync.</p>
           </div>
         `,
       })
