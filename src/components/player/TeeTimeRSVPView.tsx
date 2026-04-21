@@ -24,6 +24,14 @@ interface ConfirmedPlayer {
   note: string | null
 }
 
+interface PendingProposal {
+  id: string
+  proposed_date: string
+  proposed_start_time: string
+  proposed_course: string
+  myResponse: string | null
+}
+
 interface TeeTimeRSVPViewProps {
   teeTime: TeeTime
   myRsvp: MyRsvp
@@ -31,6 +39,7 @@ interface TeeTimeRSVPViewProps {
   pendingPlayers: string[]
   invitedBy?: string | null
   memberId: string
+  pendingProposal?: PendingProposal | null
 }
 
 export function TeeTimeRSVPView({
@@ -40,10 +49,12 @@ export function TeeTimeRSVPView({
   pendingPlayers,
   invitedBy,
   memberId,
+  pendingProposal: initialPendingProposal,
 }: TeeTimeRSVPViewProps) {
   const router = useRouter()
   const [myRsvp, setMyRsvp] = useState<MyRsvp>(initialRsvp)
   const [confirmedPlayers, setConfirmedPlayers] = useState<ConfirmedPlayer[]>(initialConfirmedPlayers)
+  const [pendingProposal, setPendingProposal] = useState<PendingProposal | null | undefined>(initialPendingProposal)
 
   async function handleRsvp(status: 'in' | 'out' | null, note?: string) {
     const effectiveStatus = status ?? myRsvp.status ?? 'pending'
@@ -75,6 +86,22 @@ export function TeeTimeRSVPView({
     router.refresh()
   }
 
+  async function handleProposalResponse(proposalId: string, response: 'yes' | 'no') {
+    const res = await authFetch(`/api/proposals/${proposalId}/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response, memberId }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      toast.error(data.error ?? 'Failed to submit response.')
+      throw new Error(data.error)
+    }
+    toast.success(response === 'yes' ? "Got it — waiting on others." : "Got it — the admin will be notified.")
+    setPendingProposal(prev => prev ? { ...prev, myResponse: response } : prev)
+    router.refresh()
+  }
+
   return (
     <div className="space-y-4">
       <div className="space-y-1">
@@ -91,6 +118,8 @@ export function TeeTimeRSVPView({
         pendingPlayers={pendingPlayers}
         invitedBy={invitedBy}
         onRsvp={handleRsvp}
+        pendingProposal={pendingProposal}
+        onProposalResponse={handleProposalResponse}
       />
     </div>
   )

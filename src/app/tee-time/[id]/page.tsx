@@ -47,8 +47,8 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
 
   if (!invite) redirect('/dashboard')
 
-  // Fetch RSVP, other RSVPs, and creator profile in parallel
-  const [{ data: myRsvpData }, { data: othersRsvps }, { data: creatorProfile }] = await Promise.all([
+  // Fetch RSVP, other RSVPs, creator profile, and pending proposal in parallel
+  const [{ data: myRsvpData }, { data: othersRsvps }, { data: creatorProfile }, { data: proposalData }] = await Promise.all([
     adminSupabase
       .from('rsvps')
       .select('status, note')
@@ -64,6 +64,12 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
     teeTime.created_by
       ? adminSupabase.from('profiles').select('name').eq('id', teeTime.created_by).maybeSingle()
       : Promise.resolve({ data: null }),
+    adminSupabase
+      .from('tee_time_proposals')
+      .select('id, proposed_date, proposed_start_time, proposed_course, proposal_responses(response, member_id)')
+      .eq('tee_time_id', id)
+      .eq('status', 'pending')
+      .maybeSingle(),
   ])
 
   const myRsvp = {
@@ -89,6 +95,17 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
     })
     .filter((name): name is string => name !== null)
 
+  const pendingProposal = proposalData
+    ? {
+        id: proposalData.id,
+        proposed_date: proposalData.proposed_date,
+        proposed_start_time: proposalData.proposed_start_time,
+        proposed_course: proposalData.proposed_course,
+        myResponse: (proposalData.proposal_responses as Array<{ response: string | null; member_id: string }>)
+          .find(r => r.member_id === member.id)?.response ?? null,
+      }
+    : null
+
   // Use teeTime without created_by in the prop (TeeTimeRSVPView doesn't need it)
   const { created_by: _cb, ...teeTimeProps } = teeTime
 
@@ -103,6 +120,7 @@ export default async function TeeTimePage({ params }: TeeTimePageProps) {
           pendingPlayers={pendingPlayers}
           invitedBy={creatorProfile?.name ?? null}
           memberId={member.id}
+          pendingProposal={pendingProposal}
         />
       </main>
     </div>

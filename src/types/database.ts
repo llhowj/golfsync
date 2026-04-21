@@ -325,6 +325,45 @@ export type Database = {
           },
         ]
       }
+      proposal_responses: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          proposal_id: string
+          response: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          proposal_id: string
+          response?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          proposal_id?: string
+          response?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_responses_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "group_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_responses_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "tee_time_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -384,6 +423,44 @@ export type Database = {
           },
           {
             foreignKeyName: "rsvps_tee_time_id_fkey"
+            columns: ["tee_time_id"]
+            isOneToOne: false
+            referencedRelation: "tee_times"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tee_time_proposals: {
+        Row: {
+          created_at: string
+          id: string
+          proposed_course: string
+          proposed_date: string
+          proposed_start_time: string
+          status: string
+          tee_time_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          proposed_course: string
+          proposed_date: string
+          proposed_start_time: string
+          status?: string
+          tee_time_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          proposed_course?: string
+          proposed_date?: string
+          proposed_start_time?: string
+          status?: string
+          tee_time_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tee_time_proposals_tee_time_id_fkey"
             columns: ["tee_time_id"]
             isOneToOne: false
             referencedRelation: "tee_times"
